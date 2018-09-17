@@ -1,0 +1,15 @@
+#!/bin/bash
+if [ "$#" -lt 1 ]; then
+    echo "Illegal number of parameters"
+    echo "Usage: " $0 "<roll number>"
+    exit 1
+fi
+
+ASN_NO=3
+ROLL_NO=$(tr '[:lower:]' '[:upper:]' <<< "$1")
+
+FILES="README.md src/java/cool/AST.java src/test_cases/*.cl src/java/cool/Semantic.java"
+
+FILE_NAME="Asn$ASN_NO$ROLL_NO.tar.gz"
+
+tar cjvf $FILE_NAME $FILES
