@@ -13,37 +13,40 @@ public class Semantic{
 /*
 	Don't change code above this line
 */
-	public class ClassNode{
-		public AST.class_ self;
-		public ClassNode parent;
-		public int isVisited;
-
-		public ClassNode(AST.class_ c){
-			this.self = c;
-			this.parent = null;
-			this.isVisited=0;
-		}
-	}
 
 	public Semantic(AST.program program){
 		//Write Semantic analyzer code here
-		ArrayList<ClassNode> listOfClasses = new ArrayList<ClassNode>();
+		ProgramNode pr = new ProgramNode(program);
+		Visitor v = new Visitor();
+		pr.accept(v);
 
-		for (AST.class_ cl : program.classes){   // For creating the inheritance graph
-			listOfClasses.add(new ClassNode(cl));
-		}
-
-		if (!checkInheritanceGraph(listOfClasses)){
-
-			System.out.println("The inheritance graph contains Cycle");
-		}
 
 		
 	}
 
 
-// Function for checking if the inheritance graph is correct or not if not then return false else true
-	public boolean checkInheritanceGraph(ArrayList<ClassNode> listOfClasses){
+
+
+
+}
+class ClassNode{
+	public AST.class_ self;
+	public ClassNode parent;
+	public int isVisited;
+
+	public ClassNode(AST.class_ c){
+		this.self = c;
+		this.parent = null;
+		this.isVisited=0;
+	}
+}
+class InheritanceGraph{
+	ArrayList<ClassNode> listOfClasses;
+	public void setGraph(ArrayList<ClassNode> listOfClasses){
+		this.listOfClasses = listOfClasses;
+	}
+	// Function for checking if the inheritance graph is correct or not if not then return false else true
+	public boolean checkInheritanceGraph(){
 
 		for(int i=0;i<listOfClasses.size();i++){
 			ClassNode temp = listOfClasses.get(i);
@@ -59,18 +62,17 @@ public class Semantic{
 				}
 			}
 			if (!cont){
-				System.out.println("No matching subclass found for class " + temp.self.name);
+				System.out.println("No matching parentclass found for class " + temp.self.name);
 				return false;
 			}
 		}	
 
 		for (ClassNode cn : listOfClasses){
 			boolean isCyclic = checkCycles(cn);
-			if (isCyclic){
-				System.out.println("The Inheritance graph is cyclic");
+			if (isCyclic) {
+				System.out.println("The inheritance graph contains cycles");
 				return false;
 			}
-
 		}
 
 		return true;
@@ -92,41 +94,56 @@ public class Semantic{
 			return check;
 		}
 	}
-
-
-
-
-
-
-
-
 }
 
 
-
-interface ASTvisitor{
-	public boolean visit(ProgramNode v);
-	public void visit(ClassNode v);
-	public void visit(FeatureNode v);
-	public void visit(AttributeNode v);
-	public void visit(ExpressionNode v);
+interface ASTvisitor {
+	public boolean visit(ProgramNode P);
+	public boolean visit(CNode C);
+	public boolean visit(CNode C,FeatureNode F);
+	public boolean visit(CNode C,AttributeNode A);
+	public boolean visit(CNode C,ExpressionNode E);
 
 }
 
-class Visitor implements ASTVisitor extends Semantic{
+class Visitor implements ASTvisitor {
+
+	public ScopeTable<AST> Table = new ScopeTable<AST>();
+	public InheritanceGraph IG = new InheritanceGraph();	
+	
 	@Override
-	public boolean visit(ProgramNode v){
+	public boolean visit(ProgramNode P){
+
 		ArrayList<ClassNode> listOfClasses = new ArrayList<ClassNode>();
 
-		for (AST.class_ cl : program.classes){   // For creating the inheritance graph
+		for (AST.class_ cl : P.prog.classes){   // For creating the inheritance graph
 			listOfClasses.add(new ClassNode(cl));
 		}
 
-		if (!checkInheritanceGraph(listOfClasses)){
+		IG.setGraph(listOfClasses);
+		if (!IG.checkInheritanceGraph()) return false;
+		return true;
+	}
+	@Override
+	public boolean visit(CNode C){
 
-			System.out.println("The inheritance graph contains Cycle");
-			return false;
-		}
+
+		return true;
+	}
+	@Override
+	public boolean visit(CNode C,FeatureNode F){
+
+
+		return true;
+	}
+
+	@Override
+	public boolean visit(CNode C,AttributeNode A){
+		return true;
+	}
+
+	@Override
+	public boolean visit(CNode C,ExpressionNode E){
 		return true;
 	}
 }
@@ -135,52 +152,36 @@ interface ASTnode {
 	public void accept(ASTvisitor visitor);
 }
 
+class ExpressionNode implements ASTnode{
+	public ExpressionNode(AST.expression a){
 
-class ProgramNode implements ASTnode {
-	AST.program prog;
-	ProgramNode(AST.program program){
-		prog = program;
 	}
 
 	@Override
 	public void accept(ASTvisitor visitor){
-		boolean cond = visitor.visit(this);
-		if (!cond) return;
-		for (AST.class_ cl : program.classes){
-			ClassNode c = new ClassNode(cl);
-			c.accept(visitor);
-		}
+		visitor.visit(this);
 	}
-	
 }
 
-class ClassNode implements ASTnode{
-	AST.class_ class;
-	ClassNode(AST.class_ cl){
-		class = cl;
+class AttributeNode implements ASTnode{
+	public AttributeNode(AST.attr a){
+
 	}
 
 	@Override
-	public void accept(ASTVisitor visitor){
+	public void accept(ASTvisitor visitor){
 		visitor.visit(this);
-
-		for (AST.feature fe : class.features){
-			FeatureNode f = new FeatureNode(fe);
-			f.accept(visitor);
-
-		}
 	}
-	 
 }
 
 class FeatureNode implements ASTnode{
 	AST.feature feature;
-	FeatureNode (AST.feature fe){
+	public FeatureNode (AST.feature fe){
 		feature = fe;
 	}
 
 	@Override
-	public void accept(ASTVisitor visitor){
+	public void accept(ASTvisitor visitor){
 		visitor.visit(this);
 	
 		if (feature instanceof AST.method){
@@ -194,3 +195,47 @@ class FeatureNode implements ASTnode{
 
 	}
 }
+
+class CNode implements ASTnode{
+
+	AST.class_ c;
+
+	public CNode(AST.class_ cl){
+		c = cl;
+	}
+
+	@Override
+	public void accept(ASTvisitor visitor){
+		visitor.visit(this);
+
+		for (AST.feature fe : c.features){
+			FeatureNode f = new FeatureNode(fe);
+			f.accept(visitor);
+
+		}
+	}
+	 
+}
+
+class ProgramNode implements ASTnode {
+	AST.program prog;
+	public ProgramNode(AST.program program){
+		prog = program;
+	}
+
+	@Override
+	public void accept(ASTvisitor visitor){
+		boolean cond = visitor.visit(this);
+		if (!cond) return;
+		
+		for (AST.class_ cl : prog.classes){
+			CNode c = new CNode(cl);
+			c.accept(visitor);
+		}
+	}
+	
+};
+
+
+
+
