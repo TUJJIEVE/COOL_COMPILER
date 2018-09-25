@@ -52,6 +52,11 @@ public class ScopeTable<T> {
 			cscope.scope--;
 		}
 	}	
+	T lookUpClassSpace(String t){
+		ClassScope cscope = searchTable(currentClass);
+		return maps.get(cscope).get(0).get(t);
+	}
+
 	T lookUpLocal(String t){
 		ClassScope cscope = searchTable(currentClass);
 		return maps.get(cscope).get(cscope.scope).get(t);
