@@ -29,6 +29,10 @@ public class Semantic{
 
 
 }
+// Implement the expression visitor for static dispatch , case , let 
+// also for the second pass , Then see if data can be reused like the type 
+// information, (can store type information of while new if etc.. in AST.expression class )
+// Implement case condition in the expressionNode accept method
 class ClassNode{
 	public AST.class_ self;
 	public ClassNode parent;
@@ -51,6 +55,7 @@ class InheritanceGraph{
 		for(int i=0;i<listOfClasses.size();i++){
 			ClassNode temp = listOfClasses.get(i);
 			if (temp.self.parent.equals("Object")) {
+				temp.parent=null;
 				continue;	
 			}
 			boolean cont = false;
@@ -126,15 +131,18 @@ class Visitor implements ASTvisitor {
 	
 	@Override
 	public boolean visit(CNode C){
+		System.out.println("Visiting :" +C.c.name);
 		C.visitCcount++;
 		Table.insertClass(C.c);
-
+		System.out.println("Visited :" +C.c.name);
 		return true;
 	}
 	
 	@Override
 	public boolean visit(FeatureNode F){
+		System.out.println("Visiting feature Node");
 		if (F.feat instanceof AST.method){
+			System.out.println("This feature is a method:"+F.method.name);
 			F.visitMcount++;
 			if (F.visitMcount<2){
 				
@@ -156,19 +164,22 @@ class Visitor implements ASTvisitor {
 						}
 					}
 				}
-
+				for (AST.formal fo : F.method.formals){
+					Table.insert(fo.name,fo);
+				}
 				Table.insert(F.method.name,F.method);
-
 				
 			}
 			else{	
-
+				// Check if no two features with same name
+				// Check if the type of expression body is equal to the return type
 
 
 			}
 		
 		}
 		else if (F.feat instanceof AST.attr){
+
 			F.visitAcount++;
 			if (F.visitAcount <2){
 				if (F.attribute.typeid.equals("NULL")){
@@ -180,12 +191,16 @@ class Visitor implements ASTvisitor {
 					System.out.println("Attribute with this nameId :" + F.attribute.name + " already exitst");
 					return false;
 				}
-
+				System.out.println("Type of attribute:"+F.attribute.typeid);
+				if (!(F.attribute.value instanceof AST.no_expr) && !getType(F.attribute.value).equals(F.attribute.typeid)){
+					System.out.println("Type of expression doesn't match typeid");
+					return false;
+				}
 				Table.insert(F.attribute.name,F.attribute);
 
 			}
 			else {
-
+				// Check for two features with same name
 
 
 			}
@@ -201,10 +216,13 @@ class Visitor implements ASTvisitor {
 
 	@Override
 	public boolean visit(ExpressionNode E){
+
 		E.visitEcount++;
+		
 		if (E.expr instanceof AST.block){
 			if (E.visitEcount<2) { 
-				Table.enterScope(); 
+				getType(E.expr);
+				System.out.println("The type of block is:"+E.expr.type);
 				return true;
 			}
 			else {
@@ -213,37 +231,377 @@ class Visitor implements ASTvisitor {
 			}
 	
 		}
+		else if (E.expr instanceof AST.no_expr){
+			System.out.println("No expression type");
+			return true;
+		}
 		else if (E.expr instanceof AST.assign){
-			if (E.visitEcount < 2) {
-				//Table.lookupClassSpace(E.ex);
+			// ON visiting first time don't flag error if in the second time no such identifier is found then flag an error
+			System.out.println("assign expression");
+
+			AST.assign ag = (AST.assign) E.expr;
+			AST.ASTNode node;
+			if (!E.flag && E.visitEcount<2) {
+				// Check if there is an attribute in the class name space if not then flag error;
+				node =Table.lookUpClassSpace(ag.name);
+				if (node == null || node instanceof AST.method){
+					System.out.println("assign operation to an invalid Identifier with name "+ag.name);
+					E.flag = true;
+					return false;
+
+				}
+				else{
+					AST.attr at = (AST.attr) node;
+					if (getType(E.expr).equals(at.typeid)){
+						Table.insert(ag.name,E.expr);
+					}else {
+						System.out.println("The type of assign expression doesn't match");
+					}
+				}
+
+
 			}
+			else if (E.flag){
+				// Check the inheritance graph
+			}
+			// Else check the type of id and the expression if it matches then insert into the symbol table
+			
+			
+
 		}
 
+		else if (E.expr instanceof AST.dispatch){
+			System.out.println("dispatch expression");
+			
+			AST.dispatch dp = (AST.dispatch) E.expr;
+			AST.ASTNode node;
+			if (!E.flag && E.visitEcount<2){
+				node =Table.lookUpClassSpace(dp.name);
+				if (node ==null || node instanceof AST.attr){
+					System.out.println("Flagged");
+					E.flag=true;
+					return false;
+				}
 
+				else {
+					AST.method m = (AST.method) node;
+					if (m.formals.size() != dp.actuals.size()){
+						System.out.println("The number of parameters passes doesn't match");
+						return false;
+					}
+					for (int i=0;i<m.formals.size();i++){
+						if (!m.formals.get(i).typeid.equals(getType(dp.actuals.get(i)))){
+							System.out.println("The parameters type don't match with the signature");
+							return false;
+						}
+					}
+					// Check condition of caller
+
+					
+				}
+
+			}
+			else if (E.flag){
+				// Check the inheritance graph;
+			}
+			
+			
+		}
+
+		else if (E.expr instanceof AST.static_dispatch){
+			System.out.println("static d expression");
+
+		}
+
+		else if (E.expr instanceof AST.cond){
+			System.out.println("if expression");
+			getType(E.expr);
+			return true;
+		}
+		else if (E.expr instanceof AST.loop){
+			System.out.println("loop expression");
+			getType(E.expr);
+			return true;
+		}
+		else if (E.expr instanceof AST.let){
+			System.out.println("let expression");
+
+		}
+
+		else if (E.expr instanceof AST.typcase){
+			System.out.println("case expression");
+
+		}
+		else if (E.expr instanceof AST.new_){
+			System.out.println("New expression");
+			AST.new_ newExp = (AST.new_) E.expr;
+			if (!E.flag && E.visitEcount<2){
+			
+				if ((newExp.typeid.equals("Int") || newExp.typeid.equals("Bool") || newExp.typeid.equals("String"))){
+					return true;
+
+				}
+				else{
+					System.out.println("Flagged");
+					E.flag=true;
+					return false;
+				}
+
+			}
+			else if (E.flag){
+				// Check in the inheritance graph
+
+			}
+		}
+		else {
+			// Check the type of the expressions. and get the type using 
+			 // getType method
+			System.out.println("expression");
+
+			getType(E.expr);
+		}
 
 		return true;
 	}
 
-	public String getType(ExpressionNode E){
+	public String getType(AST.expression E){
+			System.out.println("Type checking");
+			if (!E.type.equals("_no_type")){
+				return E.type;
+			}
 
-		if (E.expr instanceof AST.int_const){
-			return "int";
-		}
-		else if  (E.expr instanceof AST.string_const){
-			return "string";
-		}
-		else if (E.expr instanceof AST.bool_const){
-			return "bool";
-		}
-		else if (E.expr instanceof AST.object){
+			else if (E instanceof AST.object){
+				AST.object o = (AST.object) E;
+				AST.ASTNode node= Table.lookUpGlobal(o.name);
+				if (node != null) ;//return node.typeid;
+				return "hello";
+			}
+			else if (E instanceof AST.plus){
+				if (getType(((AST.plus)E).e1).equals("Int") && getType(((AST.plus)E).e2).equals("Int")){
+					E.type = "Int";
+					return "Int";
+				}else{
 
-		}
-	return "Object";
+				}
+			}
+			else if (E instanceof AST.sub){
+	
+				if (getType(((AST.sub)E).e1).equals("Int") && getType(((AST.sub)E).e2).equals("Int")){
+					E.type = "Int";
+					return "Int";
+				}else{
 
+				}
+			}
+			else if (E instanceof AST.mul){
+				if (getType(((AST.mul)E).e1).equals("Int") && getType(((AST.mul)E).e2).equals("Int")){
+					E.type = "Int";
+					return "Int";
+				}else{
+
+				}
+			}
+			else if (E instanceof AST.divide){
+
+				if (getType(((AST.divide)E).e1).equals("Int") && getType(((AST.divide)E).e2).equals("Int")){
+					E.type = "Int";
+					return "Int";
+				}else{
+
+				}
+			}
+
+			else if (E instanceof AST.comp){
+				if(getType(((AST.comp)E).e1).equals("Int")){
+					E.type = "Int" ;
+					return "Int";
+				}
+				else{
+
+				}
+	/*			if (E.type.equals("_no_type") && getType())
+	*/		}
+
+			else if (E instanceof AST.lt){
+				if (getType(((AST.lt)E).e1).equals("Int") && getType(((AST.lt)E).e2).equals("Int") ){
+					E.type = "Bool";
+					return "Bool";
+				}else{
+	                /* attach error to stderr 
+	                  take it as bool and continue checking semantics
+	                  */
+				}
+			}
+			else if (E instanceof AST.leq){
+			
+				if (getType(((AST.leq)E).e1).equals("Int") && getType(((AST.leq)E).e2).equals("Int") ){
+					E.type = "Bool";
+					return "Bool" ;
+				}else{
+	                /* attach error to stderr 
+	                  take it as bool and continue checking semantics
+	                  */
+				}
+			}
+			else if (E instanceof AST.eq){
+
+				if(getType(((AST.eq)E).e1).equals("Int") || getType(((AST.eq)E).e2).equals("Int") || getType(((AST.eq)E).e1).equals("String") || getType(((AST.eq)E).e2).equals("String") || getType(((AST.eq)E).e1).equals("Bool") || getType(((AST.eq)E).e2).equals("Bool")){
+					if(getType(((AST.eq)E).e1).equals(getType(((AST.eq)E).e2))){
+						// E.type = "bool" ;
+						// return "bool";
+					}else{
+						//error
+					}
+				}
+				E.type = "Bool";
+				return "Bool";
+			}
+			else if (E instanceof AST.neg){ //debug //check this
+				if(getType(((AST.neg)E).e1).equals("Bool")){
+					return E.type;
+				}
+				
+			}
+			else if (E instanceof AST.new_){
+				return E.type ;
+			}
+			else if(E instanceof AST.typcase){ //should write join function
+				AST.typcase typcase_ = (AST.typcase)E ;
+				ArrayList <AST.branch> branches_ = typcase_.branches ;
+				AST.expression e1 = typcase_.predicate ;
+				String type1  = getType(e1) ;
+				ArrayList <String> type_ ;
+				bool flag = true ;
+				for(AST.branch b1 : branches_){
+					AST.expression e = b1.value ;
+					String s = getType(e) ;
+					if(subtype(s,t)){ // s <= t 
+						flag = false ;
+					}
+					type_.add(getType(e));
+				}
+				if(flag){
+					//warning : case may not match to any thing
+				}
+				type_ = join(type_);
+				E.type = type_ ;
+				return type_;
+			}
+			else if(E instanceof AST.let){
+				// AST.let let_ = (AST.let)E ;
+				// AST.expression = e2 = let_.value ; //is it possible that there is no value
+				// AST.expression e1 = let_.body ;
+				String valuetype = getType((AST.let)E.value);
+				String type_ = getType((AST.let)E.body);
+
+				if(type_ != (AST.let)E.type){
+					//error
+					System.out.println("The type doesn't match");
+				}
+				return E.type ;
+			}
+			else if(E instanceof AST.block){ //dont know whether to check all expr
+			
+				int index = (AST.block)E.l1.size() - 1; 
+				E.type = getType((AST.block)E.l1.get(index)) ;
+				return E.type;
+			
+			}
+			else if(E instanceof AST.loop){ // dont know whether to check loop body 
+				if(!getType((AST.loop)E.predicate).equals("Bool")){
+					//error : invalid loop variable
+				}
+				E.type = "Object" ;
+				return "Object" ;
+			}
+			else if(E instanceof AST.cond){
+				
+				if(getType((AST.cond)E.predicate) != "Bool" ){
+					//error : no bool in branch
+					System.out.println("The predicate of if is not Bool");
+				}
+				List <String> type_ ;
+				type_.add(getType((AST.cond)E.ifbody));
+				type_.add(getType((AST.cond)E.elsebody));
+				type_ = join(type_);
+				E.type = type_ ;
+				return type_;
+			}
+/*			else if(E instanceof AST.){ //<expr>.<id>(<expr>,...,<expr>) , <id>(<expr>,...,<expr>) =>DISPATCH CLASS
+
+			}
+			else if (E instanceof AST.){ //STATIC DISPATCH
+
+			}
+*/			else if (E instanceof AST.assign){
+				AST.assign assign = (AST.assign) E;
+				AST.expression e1 = compl.e1 ;
+			    String type_ = getType(e1) ;
+				E.type = type_ ;
+				return type_;
+			}
+
+		return "Object";
 	}
+			
+		
 }
 
+/*boolean subtype(a,b){
+	List <String> pathOfa = getPathOf(a) ;
+	for(int i = 0 ; i < pathOfa.size() ; i++){
+		if(pathOfa.get(i).equals(b)){
+			return true ;
+		}
+	}
+	return false ; 
+}
+String join(List<string> a){ 
+	if(a.size().equals(0)){
+		return "Object" ; //should give error
+	}
+	else if(a.size().equals(1)){
+		return a.get(0);
+	}
+	String res = a.get(0) ;
+	for(int i = 1 ; i < a.size() ; i++){
+		res =  join2(res,a.get(i));
+	}
+	return res ;
 
+}
+String join2(String a , String b){
+	List <String> pathOfa = getPathOf(a) ;
+	List <String> pathOfb = getPathOf(b);
+	for(int i = 0 ; i < pathOfa.size() ; i++ ){
+		for(int j = 0 ; j < pathOfb.size() ; j++){
+			if(pathOfa.get(i).equals(pathOfb.get(j))){
+				return pathOfa.get(i) ;
+			}
+		}
+	}
+
+}
+
+List<String> getPathOf(String a){ //returns path it crossed till object
+	List <String> path ;
+	
+	for (int i = 0; i < IG.listOfClasses.size(); i++) {
+		if(IG.listOfClasses.get(i).name.equals(a)){
+			ClassNode t = IG.listOfClasses.get(i).parent;
+			
+			path.add(a);
+			while(t != null){
+				path.add(t.name);
+				t = t.parent;
+				
+			}
+			break;
+		};
+	}
+	path.add("Object") ;
+	return path ;
+}*/
 
 interface ASTnode {
 	public void accept(ASTvisitor visitor);
@@ -256,7 +614,7 @@ class ExpressionNode implements ASTnode{
 	AST.block blockexpr;
 	ArrayList<ExpressionNode> expList;
 	String typeInfo;
-
+	boolean flag;
 	int visitEcount;
 
 	public ExpressionNode(AST.expression a){
@@ -270,13 +628,22 @@ class ExpressionNode implements ASTnode{
 			}
 		}
 	}
-
+	// Problem when there is block inside block
 	@Override
 	public void accept(ASTvisitor visitor){
+		System.out.println("ExpressionNode visiting");
 		visitor.visit(this);
+		if (expr instanceof AST.block){
+			System.out.println("This is Block node");
+			((Visitor)visitor).Table.enterScope();
+			for (ExpressionNode e : expList){
+				e.accept(visitor);
+			}
+			((Visitor)visitor).Table.exitScope();
+		}
+		// Have to search for case statement
+		else {
 
-		for (ExpressionNode e : expList){
-			e.accept(visitor);
 		}
 	}
 }
@@ -305,11 +672,13 @@ class FeatureNode implements ASTnode{
 
 	@Override
 	public void accept(ASTvisitor visitor){
+
 		visitor.visit(this);
 	
 		if (feat instanceof AST.method){
+			((Visitor)visitor).Table.enterScope();
 			expMethod.accept(visitor);
-
+			((Visitor)visitor).Table.exitScope();
 
 		}
 		else if (feat instanceof AST.attr){
@@ -336,6 +705,7 @@ class CNode implements ASTnode{
 
 	@Override
 	public void accept(ASTvisitor visitor){
+		System.out.println("Accepting class:"+c.name);
 		visitor.visit(this);
 		for (FeatureNode fe : featNodeList){
 			fe.accept(visitor);
@@ -347,6 +717,7 @@ class CNode implements ASTnode{
 }
 
 class ProgramNode implements ASTnode {
+	
 	AST.program prog;
 	ArrayList<CNode> cNodeList;
 	public int visitPcount;
@@ -377,7 +748,12 @@ class ProgramNode implements ASTnode {
 		
 		for (CNode cl : cNodeList){
 			cl.accept(visitor);
+			System.out.println("printing ------");
+			((Visitor)visitor).Table.printTable(cl.c);
+			System.out.println("printed -------");
 		}
+
+
 	}
 	
 };
