@@ -50,6 +50,7 @@ class InheritanceGraph{
 		for(int i=0;i<listOfClasses.size();i++){
 			ClassNode temp = listOfClasses.get(i);
 			if (temp.self.parent.equals("Object")) {
+				temp.parent=null;
 				continue;	
 			}
 			boolean cont = false;
@@ -612,7 +613,7 @@ class ProgramNode implements ASTnode {
 	}
 }
 boolean subtype(a,b){
-	List <String> pathOfa = getPathto(a) ;
+	List <String> pathOfa = getPathOf(a) ;
 	for(int i = 0 ; i < pathOfa.size() ; i++){
 		if(pathOfa.get(i).equals(b)){
 			return true ;
@@ -635,8 +636,8 @@ String join(List<string> a){
 
 }
 String join2(String a , String b){
-	List <String> pathOfa = getPathto(a) ;
-	List <String> pathOfb = getPathto(b);
+	List <String> pathOfa = getPathOf(a) ;
+	List <String> pathOfb = getPathOf(b);
 	for(int i = 0 ; i < pathOfa.size() ; i++ ){
 		for(int j = 0 ; j < pathOfb.size() ; j++){
 			if(pathOfa.get(i).equals(pathOfb.get(j))){
@@ -646,24 +647,19 @@ String join2(String a , String b){
 	}
 
 }
-String getParentName(String a){
-	for (int i = 0; i < IG.listOfClasses.size(); i++) {
-		classNode c = IG.listOfClasses.get(i) ;
-		if(c.name.equals(a)){
-			return c.parent ;
-		};
-	}
-	return "";
-}
-List<String> getPathto(String a){ //returns path it crossed till object
+
+List<String> getPathOf(String a){ //returns path it crossed till object
 	List <String> path ;
-	path.add(a);
+	
 	for (int i = 0; i < IG.listOfClasses.size(); i++) {
 		if(IG.listOfClasses.get(i).name.equals(a)){
-			String temp = getParentName(a) ;
-			while(temp!=""){
-				path.add(temp);
-				temp =getParentName(temp)  ;
+			ClassNode t = IG.listOfClasses.get(i).parent;
+			
+			path.add(a);
+			while(t != null){
+				path.add(t.name);
+				t = t.parent;
+				
 			}
 			break;
 		};
