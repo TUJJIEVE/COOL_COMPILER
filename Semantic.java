@@ -1,5 +1,6 @@
 package cool;
 import java.util.ArrayList;
+import java.util.List;
 public class Semantic{
 	private boolean errorFlag = false;
 	public void reportError(String filename, int lineNo, String error){
@@ -363,6 +364,61 @@ class Visitor implements ASTvisitor {
 
 		return true;
 	}
+	String join(List<String> a){ 
+	if(a.size() == 0){
+		return "Object" ; //should give error
+	}
+	else if(a.size() == 1){
+		return a.get(0);
+	}
+	String res = a.get(0) ;
+	for(int i = 1 ; i < a.size() ; i++){
+		res =  join2(res,a.get(i));
+	}
+	return res ;
+
+}
+String join2(String a , String b){
+	List <String> pathOfa = getPathOf(a) ;
+	List <String> pathOfb = getPathOf(b);
+	for(int i = 0 ; i < pathOfa.size() ; i++ ){
+		for(int j = 0 ; j < pathOfb.size() ; j++){
+			if(pathOfa.get(i).equals(pathOfb.get(j))){
+				return pathOfa.get(i) ;
+			}
+		}
+	}
+	return "object";
+}
+
+List<String> getPathOf(String a){ //returns path it crossed till object
+	List<String> path= new ArrayList<String>();
+	
+	for (int i = 0; i < IG.listOfClasses.size(); i++) {
+		if(IG.listOfClasses.get(i).self.name == a){
+			ClassNode t = IG.listOfClasses.get(i).parent;
+			
+			path.add(a);
+			while(t != null){
+				path.add(t.self.name);
+				t = t.parent;
+				
+			}
+			break;
+		};
+	}
+	path.add("Object") ;
+	return path ;
+}
+	boolean subtype(String a, String b){
+		List <String> pathOfa = getPathOf(a) ;
+		for(int i = 0 ; i < pathOfa.size() ; i++){
+			if(pathOfa.get(i).equals(b)){
+				return true ;
+			}
+		}
+	return false ; 
+	}
 
 	public String getType(AST.expression E){
 			System.out.println("Type checking");
@@ -373,7 +429,9 @@ class Visitor implements ASTvisitor {
 			else if (E instanceof AST.object){
 				AST.object o = (AST.object) E;
 				AST.ASTNode node= Table.lookUpGlobal(o.name);
-				if (node != null) ;//return node.typeid;
+				if (node != null){//return node.typeid;
+					return "barbeque";
+				}
 				return "hello";
 			}
 			else if (E instanceof AST.plus){
@@ -467,15 +525,15 @@ class Visitor implements ASTvisitor {
 			}
 			else if(E instanceof AST.typcase){ //should write join function
 				AST.typcase typcase_ = (AST.typcase)E ;
-				ArrayList <AST.branch> branches_ = typcase_.branches ;
+				//List <AST.branch> branches_ = typcase_.branches ;
 				AST.expression e1 = typcase_.predicate ;
 				String type1  = getType(e1) ;
-				ArrayList <String> type_ ;
-				bool flag = true ;
-				for(AST.branch b1 : branches_){
+				List<String> type_ = new ArrayList<String>();
+				boolean flag = true ;
+				for(AST.branch b1 : typcase_.branches){
 					AST.expression e = b1.value ;
 					String s = getType(e) ;
-					if(subtype(s,t)){ // s <= t 
+					if(subtype(s,type1)){ // s <= t 
 						flag = false ;
 					}
 					type_.add(getType(e));
@@ -483,18 +541,18 @@ class Visitor implements ASTvisitor {
 				if(flag){
 					//warning : case may not match to any thing
 				}
-				type_ = join(type_);
-				E.type = type_ ;
-				return type_;
+				String restype_ = join(type_);
+				E.type = restype_ ;
+				return restype_;
 			}
 			else if(E instanceof AST.let){
 				// AST.let let_ = (AST.let)E ;
 				// AST.expression = e2 = let_.value ; //is it possible that there is no value
 				// AST.expression e1 = let_.body ;
-				String valuetype = getType((AST.let)E.value);
-				String type_ = getType((AST.let)E.body);
+				String valuetype = getType(((AST.let)E).value);
+				String type_ = getType(((AST.let)E).body);
 
-				if(type_ != (AST.let)E.type){
+				if(type_ != ((AST.let)E).type){
 					//error
 					System.out.println("The type doesn't match");
 				}
@@ -502,13 +560,13 @@ class Visitor implements ASTvisitor {
 			}
 			else if(E instanceof AST.block){ //dont know whether to check all expr
 			
-				int index = (AST.block)E.l1.size() - 1; 
-				E.type = getType((AST.block)E.l1.get(index)) ;
+				int index = ((AST.block)E).l1.size() - 1; 
+				E.type = getType(((AST.block)E).l1.get(index)) ;
 				return E.type;
 			
 			}
 			else if(E instanceof AST.loop){ // dont know whether to check loop body 
-				if(!getType((AST.loop)E.predicate).equals("Bool")){
+				if(!getType(((AST.loop)E).predicate).equals("Bool")){
 					//error : invalid loop variable
 				}
 				E.type = "Object" ;
@@ -516,16 +574,16 @@ class Visitor implements ASTvisitor {
 			}
 			else if(E instanceof AST.cond){
 				
-				if(getType((AST.cond)E.predicate) != "Bool" ){
+				if(getType(((AST.cond)E).predicate) != "Bool" ){
 					//error : no bool in branch
 					System.out.println("The predicate of if is not Bool");
 				}
-				List <String> type_ ;
-				type_.add(getType((AST.cond)E.ifbody));
-				type_.add(getType((AST.cond)E.elsebody));
-				type_ = join(type_);
-				E.type = type_ ;
-				return type_;
+				List<String> type_ = new ArrayList<String>();
+				type_.add(getType(((AST.cond)E).ifbody));
+				type_.add(getType(((AST.cond)E).elsebody));
+				String restype_ = join(type_);
+				E.type = restype_ ;
+				return restype_;
 			}
 /*			else if(E instanceof AST.){ //<expr>.<id>(<expr>,...,<expr>) , <id>(<expr>,...,<expr>) =>DISPATCH CLASS
 
@@ -535,7 +593,7 @@ class Visitor implements ASTvisitor {
 			}
 */			else if (E instanceof AST.assign){
 				AST.assign assign = (AST.assign) E;
-				AST.expression e1 = compl.e1 ;
+				AST.expression e1 = assign.e1 ;
 			    String type_ = getType(e1) ;
 				E.type = type_ ;
 				return type_;
@@ -757,6 +815,7 @@ class ProgramNode implements ASTnode {
 	}
 	
 };
+
 
 
 
