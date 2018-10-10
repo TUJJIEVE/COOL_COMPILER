@@ -1,8 +1,8 @@
 
-#                                            cool language semantics 
-##                                             CS3423: Assignment 2
-###                                                                        -cs16btech11029,cs16btech11039
-#### ============================================================================================================================
+#                        cool language semantics 
+##                        CS3423: Assignment 2
+###                                                 -cs16btech11029,cs16btech11039
+#### =========================================================================
 ##### contents:
 ###### 1.Overview.
 ###### 2.Design Of Semantic Analyzer.
@@ -12,9 +12,9 @@
 ---
 
 #### Overview: 
-1. used vistor design pattern for checking semantics 
-2. 
-3.
+1. Used vistor design pattern for checking semantics 
+2. Created and Checked the inheritance Graph 
+3. Made 2 passes to the AST for complete type checking 
 #### Design Of Semantic Analyzer.
 ###### ABOUT VISITOR DESIGN PATTERN :
 * Visitor design pattern is one of the behavioral design pattern. It is used when we have to perform an operation on a group of similar kind of Objects. With the help of visitor pattern, we can move the operational logic from the objects to another class.
@@ -42,16 +42,23 @@
 * The type checking is done in the getType function which takes an AST.expression object and depending upon which class it belongs does the necessary type checking 
 #### Details of Program.
 **0.StartPoint**
-* the `program ` node is created , then `visitor` Object is created and program node accepts this visitor using the accept function. 
+* the `ProgramNode`is created , then `visitor` Object of ASTvisitor class is created and program node accepts this visitor using the accept function. 
  
 **1.Main class**
 * Before building graph itself we will check whether `Main` class and whether `main` function is declared in side `Main` class , and ensure such that there exists only one defination for `main()` in **ProgramNode** constructor . Program exits here if there are multiple definations for `Main` classes printing appropriate error messages. 
+* Also if there is any class that inherits from Bool, Int, String then error is printed and semantic is aborted.
 
 **2.Inheritance Graph**
 * when AST is given to Semantic analyser it will intially form `Inheritance Graph` , in which root will be `Object` class . Inheritance graph is a Array List of type `ClassNode` . `ClassNode` class has 3 attributes `self` of `AST.class_` class , `parent` of `ClassNode` class , `isVisited` of type  `int` . `self` is the corresponding cool class , `parent` is `ClassNode` for the class that `self` inherited from . if there is no inheritance from any class then parent will be null. `isVisted` is used to find CYCLES in Inheritance graph . Cycles checks are done as we build graph.if the graph is **well=formed** we will proceed to next step of semantic analysis.
+* If any cycle is detected then message is printed and semantic is aborted.
 
 **3.For Each Nodes in AST**
 * Using **`Vistor pattern`** described above , each Node of **AST** is visited .
+* For each Expression node getType function is called which does the entire type checking and also returns the expression Type.
+* For each feature node various checks is performed like formal parameter validation,
+overriden methods etc..
+* For each class node class scope is created in the scope table and inbuilt functions are inserted in the topmost scope.
+* For each Program node it's inheritance graph is constructed and validated.
 
 **4.Scope cum Symbol Table**
 * The scope table is a `HashMap` with `ClassScope` object as key and `Arraylist` of Hash map as value. **HashMap`<`*ClassScope*,*ArrayList*`<`HashMap`<`String,AST.ASTNode`>>>`**
@@ -68,6 +75,7 @@
       }
 ```
 * For each class there is a `ArrayList` maintained . In each index of  arraylist a `HashMap` is maintained. The indices of the `Arraylist` represent the scope of the program in a particular class. The `HashMap` has name of `features` as key and its `ASTnode` as value .
+* All the inbuilt functions , features of classes are stored in the outermost scope with scope value 0. 
 * `insertClass` funtion is used to insert class in Scopetable . this will create a new object adds to existing hashTable.
 * `serchTable` function is used to search in Hashtable.iterates over the Hashvalues to match key if key is matched it returns value otherwise it returns null.
 * `enterScope` function for entering in a new scope .
@@ -127,4 +135,3 @@ Open `semantic/src/java` :
 ```
         ./semantic <filename>.cl
 ```
-
