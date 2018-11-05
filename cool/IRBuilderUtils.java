@@ -106,7 +106,7 @@ public class IRBuilderUtils {
         System.out.println("Generate Inst from parent");
         String GEPReg = "%"+node.name;
 
-        if (Globals.liveAttrPtr.get(node.name)==null) {
+        if (checkPtrExistance(node.name)) {
             String bitcastReg = generateBitCastInst(Globals.currentClassPtr, Globals.scopeTable.currentClass.name, node.className);
             GEPReg = generateGEPInstForAttr(node.name, node.className, bitcastReg, Globals.attributeToAddrMap.get(node.className).get(node));
         }
@@ -124,7 +124,7 @@ public class IRBuilderUtils {
 
             if (! Globals.currentClassPtrType.equals(node.typeid)){
                 String GEPReg = "%"+node.name;
-                if (Globals.liveAttrPtr.get(node.name)==null) {
+                if (checkPtrExistance(node.name)) {
                   //String bitcastReg = generateBitCastInst(Globals.currentClassPtr, Globals.scopeTable.currentClass.name, node.typeid);
                     GEPReg = generateGEPInstForAttr(node.name,node.className,Globals.currentClassPtr,Globals.attributeToAddrMap.get(node.className).get(node));
                 }
@@ -133,7 +133,7 @@ public class IRBuilderUtils {
             }
             else{
                 String GEPReg = "%"+node.name;
-                if (Globals.liveAttrPtr.get(node.name)==null){
+                if (checkPtrExistance(node.name)){
                     GEPReg = generateGEPInstForAttr(node.name,node.className,Globals.currentClassPtr,Globals.attributeToAddrMap.get(node.className).get(node));
                 }
                 return GEPReg;
@@ -141,7 +141,7 @@ public class IRBuilderUtils {
         }
         else{
             String reg = "%"+node.name;
-            if (Globals.liveAttrPtr.get(node.name)==null) reg = generateGEPInstForAttr(node.name, node.className, "%this1",Globals.attributeToAddrMap.get(node.className).get(node));
+            if (checkPtrExistance(node.name)) reg = generateGEPInstForAttr(node.name, node.className, "%this1",Globals.attributeToAddrMap.get(node.className).get(node));
             loadReg = generateLoadInst(getNewVariableName(), node.typeid, reg);
             return loadReg;
         }
@@ -289,6 +289,10 @@ public class IRBuilderUtils {
 
     }
 
+    public Boolean checkPtrExistance(String name){
+        System.out.println("Checking gep");
+        return true;
+    }
 
 
     public String generateGEPInstForAttr(String name,String type,String accessAddr,Integer index){
@@ -296,7 +300,14 @@ public class IRBuilderUtils {
         System.out.println("Generating gep for class attr Instructions");
         String value = "%"+name;
         StringBuilder SB = new StringBuilder();
-        Globals.liveAttrPtr.put(name, true);
+       // if (Globals.space > Globals.liveLocalAttrPtr.size()-1) Globals.liveLocalAttrPtr.add(new HashMap<String,Boolean>());
+        //if (Globals.liveLocalAttrPtr.get(Globals.space)==null) Globals.liveLocalAttrPtr.add(new HashMap<String,Boolean>());
+       // Globals.liveLocalAttrPtr.get(Globals.space).put(name,true);
+        if (Globals.liveAttrPtr.get(name)==null) Globals.liveAttrPtr.put(name,1);
+        else {value+=Globals.liveAttrPtr.get(name);
+        Integer temp = Globals.liveAttrPtr.get(name);
+        Globals.liveAttrPtr.remove(name);
+        Globals.liveAttrPtr.put(name,temp+1);}
         SB.append(Indent).append(value).append(" = ").append("getelementptr inbounds ");
         SB.append(getTypeid(type,0));
         if (!Globals.isPrimitiveType(type)) SB.deleteCharAt(SB.length()-1);

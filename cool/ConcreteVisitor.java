@@ -114,11 +114,11 @@ public class ConcreteVisitor implements Visitor {
 			for (AST.class_ cl : program.classes){
 				listOfClasses.add(new ClassNode(cl));
 			}
-			ArrayList<String> stringsFound = new ArrayList<String>();
+			//ArrayList<String> stringsFound = new ArrayList<String>();
 			
-			stringsFound.add("%d");
-			stringsFound.add("%s");
-			stringsFound.add("Error : Division by zero");
+			Globals.stringsFound.add("%d");
+			Globals.stringsFound.add("%s");
+			Globals.stringsFound.add("Error : Division by zero");
 			Globals.IG.setGraph(listOfClasses);
 			Globals.methodMap.put("in_string","@scanf");
 			Globals.methodMap.put("out_int","@printf");
@@ -141,6 +141,7 @@ public class ConcreteVisitor implements Visitor {
 			Globals.methodMap.put("type_name","@"+Globals.IRB.getClassMangledName("type_name"));
 			Globals.methodReturnMap.put("@"+Globals.IRB.getClassMangledName("type_name"),"String");
 
+			Globals.liveLocalAttrPtr.add(new HashMap<String,Boolean>());
 			//Globals.methodMap.put("substr","@")
 			for (AST.class_ cl : program.classes){
 				Globals.scopeTable.insertClass(cl);
@@ -148,7 +149,7 @@ public class ConcreteVisitor implements Visitor {
 				Globals.attributeToAddrMap.put(cl.name,new HashMap<AST.attr,Integer>());
 				int index = 2;
 				if(Globals.IG.getClassNode(cl).parent!=null) index++;
-				stringsFound.add(cl.name);
+				Globals.stringsFound.add(cl.name);
 				for (AST.feature f : cl.features){
 					f.className = cl.name;
 					
@@ -156,10 +157,10 @@ public class ConcreteVisitor implements Visitor {
 						
 						Globals.scopeTable.insert(f.name, ((AST.attr)f));
 						
-						if ( ((AST.attr)f).value instanceof AST.string_const){
-							AST.string_const s  =(AST.string_const) ((AST.attr)f).value;
-							stringsFound.add(s.value);						
-						}
+						// if ( ((AST.attr)f).value instanceof AST.string_const){
+						// 	AST.string_const s  =(AST.string_const) ((AST.attr)f).value;
+						// 	Globals.stringsFound.add(s.value);						
+						// }
 
 						Globals.attributeToAddrMap.get(cl.name).put((AST.attr)f,index);
 						index++;
@@ -181,7 +182,7 @@ public class ConcreteVisitor implements Visitor {
 			Globals.IG.resetGraph();
 
 			Globals.outFile.println("\n");
-			for (String s : stringsFound){
+			for (String s : Globals.stringsFound){
 				Globals.IRB.generateGlobalString(s);
 
 			}
@@ -261,8 +262,8 @@ public class ConcreteVisitor implements Visitor {
 			}
 			Globals.IRB.generateReturnInst(method.typeid, returnAddr);
 			Globals.outFile.println("}");
-			
 			Globals.liveAttrPtr.clear();
+			//Globals.liveLocalAttrPtr.get(0).clear();
 
 
 

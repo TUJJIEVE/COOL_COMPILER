@@ -4,11 +4,8 @@ import java.util.HashMap;
 import java.*;
 
 
-// To Do : Implement String and printf and scanf codes. 
-// To Do : implement the default functions check if new assign , if  are working properly 
-// To Do : collect all the strings in the program can use semantic analyzer to collect all strings.
-// To Do : how to assign of class types .
-// To Do : 
+// To Do : Check every binary operator 
+// To Do : How to creat a new Class struct , Int ,String ,Bool 
 
 public class IRBuilder extends IRBuilderUtils{
     public IRBuilder(){
@@ -22,7 +19,7 @@ public class IRBuilder extends IRBuilderUtils{
         Globals.currentLocalReg=0;
         Globals.currentClassPtrType=getTypeid(cl.name, 0);
         Globals.scopeTable.setCurrentClass(cl);
-
+        
         StringBuilder SB = new StringBuilder();
         SB.append(
             "define dso_local void @" +getClassMangledName(cl.name)+
@@ -71,8 +68,9 @@ public class IRBuilder extends IRBuilderUtils{
         }
         SB.append(Indent+"ret void\n}");
 
+ //       Globals.liveLocalAttrPtr.get(0).clear();
         Globals.liveAttrPtr.clear();
-        Globals.outFile.println(SB.toString());
+     Globals.outFile.println(SB.toString());
         return null;
 
     }
@@ -248,12 +246,14 @@ public class IRBuilder extends IRBuilderUtils{
             // To do : see if bitcast instruction is needed or not
             //adding br instruction in this block//
             String returnReg = getNewVariableName();
-            SB.append(Indent+returnReg +" = alloca "+getTypeid(expType,0));
+            SB.append(Indent+returnReg +" = alloca "+getTypeid(expType,0)+"\n");
             SB.append(Indent+"br i1 ").append(predicate).append(", label %").append(ifbody).append(", label %").append(elsebody) ;
 
             //create label instruction of ifblock ;//
             SB.append("\n\n");
-         //   Globals.liveAttrPtr.clear();
+            // Globals.space+=1;
+            // Globals.liveLocalAttrPtr.add(new HashMap<String,Boolean>());
+            //   Globals.liveAttrPtr.clear();
             SB.append(ifbody).append(":") ;
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
@@ -267,7 +267,14 @@ public class IRBuilder extends IRBuilderUtils{
           
             SB.append(Indent+"br label %").append(afterbranch);
             SB.append("\n\n");
-           // Globals.liveAttrPtr.clear();
+
+            // Globals.liveLocalAttrPtr.remove(Globals.space);
+            // Globals.space-=1;
+            
+            System.out.println("Space: "+Globals.space);
+            // Globals.space+=1;
+            // Globals.liveLocalAttrPtr.add(new HashMap<String,Boolean>());
+            // Globals.liveAttrPtr.clear();
             SB.append(elsebody).append(":") ;
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
@@ -280,10 +287,14 @@ public class IRBuilder extends IRBuilderUtils{
             
             SB.append(Indent+"br label %").append(afterbranch);
             SB.append("\n\n");
-          //  Globals.liveAttrPtr.clear();
+   
+            // Globals.liveLocalAttrPtr.remove(Globals.space);
+            // Globals.space-=1;            
+   
+            System.out.println("Space: "+Globals.space);
             SB.append(afterbranch).append(":");
             Globals.outFile.println(SB.toString());
-            
+            //Globals.liveAttrPtr.clear();
             return generateLoadInst(getNewVariableName(),expType,returnReg);
             //return predicate;  // see if returned value to be used anywhere or not
         }
@@ -301,13 +312,17 @@ public class IRBuilder extends IRBuilderUtils{
 
         else if (e instanceof AST.loop){
             
+           // Globals.livelocalAttrPtr.add(new HashMap<String,Boolean>());
             System.out.println("Generating Instructions for loop");
             StringBuilder SB = new StringBuilder() ;
-         //   Globals.liveAttrPtr.clear();
+
+            //Globals.localLiveAttrPtr.get(Globals.space).clear();
+            
             String loopNumber  =  getNewLoopName();
             String predicate = generateInstruction(((AST.loop)e).predicate);
             Globals.outFile.println(Indent+"br i1 "+predicate+", label %while.cond"+loopNumber+", label %while.end"+loopNumber);
             Globals.outFile.print("");
+            // Globals.space +=1;
             SB.append("while.cond"+loopNumber).append(":");
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
@@ -315,19 +330,24 @@ public class IRBuilder extends IRBuilderUtils{
             if(! ((AST.loop)e).predicate.type.equals("Bool")) value = getTruncInst(value,getTypeid(value,0),"i1"); //how to get typeid //
             SB.append(Indent+"br i1 ").append(value).append(" , label ").append("%while.body"+loopNumber).append(" , label ").append("%while.end"+loopNumber) ; //conditional branch
             SB.append("\n\n");
-         //   Globals.liveAttrPtr.clear();
+            // Globals.space -=1;
+            
+            //Globals.liveLocalAttrPtr.get(Globals.space).clear();
+
+            // Globals.space +=1;
             SB.append("while.body"+loopNumber).append(":");
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
-
             value = generateInstruction(((AST.loop)e).body);
-
             SB.append(Indent+"br label ").append("%while.cond"+loopNumber).append("\n\n");
-          //  Globals.liveAttrPtr.clear();
+
+            //Globals.liveLocalAttrPtr.get(Globals.space).clear();
+
             SB.append("while.end"+loopNumber).append(":");
-
             Globals.outFile.println(SB.toString());
-
+            
+            //Globals.livelocalAttrPtr.remove(Globals.space);
+            // Globals.space -= 1;
             return null ;
         }
         else if (e instanceof AST.assign){
@@ -348,7 +368,7 @@ public class IRBuilder extends IRBuilderUtils{
                  if (id==null){
                    id = (AST.attr) Globals.scopeTable.lookUpParent(((AST.assign)e).name,AST.attr.class);
                    interReg = generateBitCastInst("%this1", Globals.scopeTable.currentClass.name,Globals.scopeTable.parClass.name);        
-                   if (Globals.liveAttrPtr.get(((AST.assign)e).name)==null) interReg = generateGEPInstForAttr(((AST.assign)e).name,Globals.scopeTable.parClass.name, interReg, Globals.attributeToAddrMap.get(Globals.scopeTable.parClass.name).get(((AST.attr)id))); 
+                   if (checkPtrExistance(((AST.assign)e).name)) interReg = generateGEPInstForAttr(((AST.assign)e).name,Globals.scopeTable.parClass.name, interReg, Globals.attributeToAddrMap.get(Globals.scopeTable.parClass.name).get(((AST.attr)id))); 
                    generateStoreInst(interReg,((AST.attr)id).typeid,finalReg);
                    if(Globals.isPrimitiveType(((AST.assign)e).type) ) return generateLoadInst(getNewVariableName(),((AST.assign)e).type,interReg);        
       
@@ -356,7 +376,7 @@ public class IRBuilder extends IRBuilderUtils{
                 }
                 else{
                     interReg ="%"+((AST.assign)e).name;
-                    if (Globals.liveAttrPtr.get(((AST.assign)e).name) == null){
+                    if (checkPtrExistance(((AST.assign)e).name)){
                         System.out.println(Globals.scopeTable.currentClass.name);
                         System.out.println(((AST.attr)id).name);
                         System.out.println(Globals.attributeToAddrMap.get(Globals.scopeTable.currentClass.name).get(((AST.attr)id)));
@@ -517,10 +537,13 @@ public class IRBuilder extends IRBuilderUtils{
             }
             else if (((AST.static_dispatch)e).name.equals("abort")){
                 return generateExitCall();
-                //return "";
+                
             }
             else if (((AST.static_dispatch)e).name.equals("type_name")){
                 return generatetypeNameCall(arguments.get(0),((AST.static_dispatch)e).caller.type,returnReg);
+            }
+            else if (((AST.static_dispatch)e).name.equals("copy")){
+                // implement copy method;
             }
             else generateCallInst(returnType,methodName,types,arguments,returnReg);
             

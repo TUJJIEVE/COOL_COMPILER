@@ -67,6 +67,7 @@ public class AST{
 			value = v;
 			lineNo = l;
 			type = "String";
+			Globals.stringsFound.add(v);
 		}
 		String getString(String space){
 			return space+"#"+lineNo+"\n"+space+"_string\n"+space+sp+"\""+escapeSpecialCharacters(value)+"\""+"\n"+space+": "+type;

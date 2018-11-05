@@ -25,15 +25,18 @@ public class Globals {
 	public static HashMap<AST.class_,String> classToStructMap = new HashMap<AST.class_,String>();
 	public static HashMap<String,String> classNameToStructMap = new HashMap<String,String>();
 	public static HashMap<String,HashMap<AST.attr,Integer>> attributeToAddrMap = new HashMap<String,HashMap<AST.attr,Integer>>();
-	public static HashMap<String,Boolean> liveAttrPtr = new HashMap<String,Boolean>();
+	public static HashMap<String,Integer> liveAttrPtr = new HashMap<String,Integer>();
 	public static String currentClassPtr="%this1";
 	public static String currentClassPtrType;
 	public static String mainReturnType;
 	public static boolean isPrintfUsed = false;
 	public static boolean isIndent=false;
+	public static ArrayList<String> stringsFound = new ArrayList<String>();
 	public static StringBuilder SB = new StringBuilder();
 	public static HashMap<String,String> globalStrings  = new HashMap<String,String>();
+	public static ArrayList<HashMap<String,Boolean>> liveLocalAttrPtr = new ArrayList<HashMap<String,Boolean>>();
 	public static Integer numGlobalStrings= 0;
+	public static int space = 0;
 	public static boolean isPrimitiveType(String type){
 		return type.equals("Int") || type.equals("String") || type.equals("Bool")  ;
 
