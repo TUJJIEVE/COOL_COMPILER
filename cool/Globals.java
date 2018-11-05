@@ -19,6 +19,7 @@ public class Globals {
 		outFile = out;
 	}
 	public static HashMap<String,String> methodMap = new HashMap<String,String>();
+	public static HashMap<String,String> methodReturnMap = new HashMap<String,String>();
 	public static HashMap<String,String> classToConstructorMap = new HashMap<String,String>();
 
 	public static HashMap<AST.class_,String> classToStructMap = new HashMap<AST.class_,String>();
@@ -32,9 +33,9 @@ public class Globals {
 	public static boolean isIndent=false;
 	public static StringBuilder SB = new StringBuilder();
 	public static HashMap<String,String> globalStrings  = new HashMap<String,String>();
-	public static Integer numGlobalStrings= new Integer(0);
+	public static Integer numGlobalStrings= 0;
 	public static boolean isPrimitiveType(String type){
-		return type.equals("Int") || type.equals("String") || type.equals("Bool") || type.equals("IO") || type.equals("Object") ;
+		return type.equals("Int") || type.equals("String") || type.equals("Bool")  ;
 
 	}
 	

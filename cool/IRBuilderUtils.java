@@ -46,7 +46,13 @@ public class IRBuilderUtils {
         //SB.append("target datalayout = e-m:e-i64:64-f80:128-n8:16:32:64-S128\n");
         //SB.append("target triple = x86_64");
         SB.append("declare dso_local i32 @printf(i8*, ...)\n\n");
-        SB.append("declare dso_local i32 @scanf(i8*, ...)");
+        SB.append("declare dso_local i32 @scanf(i8*, ...)\n\n");
+        SB.append("declare dso_local void @exit(i32)\n\n");
+        SB.append("declare dso_local i64 @strlen(i8*)\n\n");
+        SB.append("declare dso_local i8* @strcat(i8*, i8*)\n\n");
+        SB.append("declare dso_local noalias i8* @malloc(i64)\n\n");
+        SB.append("declare dso_local i8* @strncpy(i8*, i8*, i64)\n");
+
         Globals.outFile.println(SB.toString());
         // Also write default functions 
         
@@ -58,7 +64,9 @@ public class IRBuilderUtils {
             case "Bool" : return Bool;
             case "Int"  : return Int_32;
             case "String" : return string;
-            case "IO" : return "void";
+            case "IO" : return Globals.classNameToStructMap.get(type)+"*";
+            case "Object" : return Globals.classNameToStructMap.get(type)+"*";
+            case "void" : return "void";
         }
         // If non primitive types then 
         return Globals.classNameToStructMap.get(type)+"*";
@@ -79,7 +87,7 @@ public class IRBuilderUtils {
         StringBuilder SB = new StringBuilder();
         SB.append(Indent+addressToStore + " = alloca " + getTypeid(typeid,0));
         if (!isPtr && !Globals.isPrimitiveType(typeid)) SB.deleteCharAt(SB.length()-1); 
-        SB.append(", align " + getAlignment(typeid,0));
+        //SB.append(", align " + getAlignment(typeid,0));
         Globals.outFile.println(SB.toString());
         // String last = (num == 0) ? ", "+type + " "+Integer.toString(num) : " ";
         // last = last + ( " ; yields "+type + " * ; pointer\n" );
@@ -146,7 +154,7 @@ public class IRBuilderUtils {
         StringBuilder SB = new StringBuilder();
         String structName = "%class."+cl.name;
         Globals.classNameToStructMap.put(cl.name,structName);
-        SB.append(structName + " = " + "type { ");
+        SB.append(structName + " = " + "type { %class.Object, i8*, ");
         boolean anyFeatures = false;
 
         ClassNode parentClass = Globals.IG.getClassNode(cl).parent;
@@ -166,13 +174,9 @@ public class IRBuilderUtils {
                 anyFeatures = true;
             }
         }
-        if (anyFeatures){
-            SB.deleteCharAt(SB.length()-1);
-            SB.deleteCharAt(SB.length()-1);
-        }
-        else{
-            SB.append("i8");
-        }
+        SB.deleteCharAt(SB.length()-1);
+        SB.deleteCharAt(SB.length()-1);
+
         SB.append(" }");
         Globals.outFile.println(SB.toString());
         return structName;
@@ -286,6 +290,7 @@ public class IRBuilderUtils {
     }
 
 
+
     public String generateGEPInstForAttr(String name,String type,String accessAddr,Integer index){
       
         System.out.println("Generating gep for class attr Instructions");
@@ -366,24 +371,30 @@ public class IRBuilderUtils {
 //%call3 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.1, i32 0, i32 0), i32 %2)
           
           StringBuilder SB = new StringBuilder();
-          SB.append(Indent).append(returnReg).append(" = ").append(" call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([3 x i8], [3 x i8]* ");
- 
-          if (type.equals("Int")) SB.append(Globals.globalStrings.get("%d"));
-          else SB.append(Globals.globalStrings.get("%s"));
- 
+          SB.append(Indent).append(returnReg).append(" = ").append(" call i32 (i8*, ...) @printf(i8* getelementptr inbounds (");
+         
+          if (type.equals("Int")) SB.append("[3 x i8], [3 x i8]* ").append(Globals.globalStrings.get("%d"));
+          else if(type.equals("String")) SB.append("[3 x i8], [3 x i8]* ").append(Globals.globalStrings.get("%s"));
+          else {
+            SB.append("["+(toPrint.length()+1) +" x i8], ["+ (toPrint.length()+1) +" x i8]* ").append(Globals.globalStrings.get(toPrint));
+          }
           SB.append(", i32 0, i32 0),");
  
-          if (type.equals("Int")) SB.append(" i32 ");
-          else SB.append(" i8* ");
- 
-          SB.append(toPrint).append(")");
+          if (type.equals("Int")) SB.append(" i32 ").append(toPrint);
+          else if (type.equals("String")) SB.append(" i8* ").append(toPrint);
+          else {
+              SB.deleteCharAt(SB.length()-1);
+          }
+          SB.append(")");
           Globals.outFile.println(SB.toString());
           return returnReg;
 
     }
-    public String generateScanfCall(String toScan,String returnReg,String type){
-        
+    public String generateScanfCall(String returnReg,String type){
+        System.out.println("generating scanf call");
         StringBuilder SB = new StringBuilder();
+        String reg = getNewVariableName();
+        reg = generateAllocaInst(type, reg, false);
         SB.append(Indent).append(returnReg).append(" = ").append(" call i32 (i8*, ...) @scanf(i8* getelementptr inbounds ([3 x i8], [3 x i8]* ");
  
         if (type.equals("Int")) SB.append(Globals.globalStrings.get("%d"));
@@ -392,11 +403,13 @@ public class IRBuilderUtils {
         SB.append(", i32 0, i32 0),");
  
         if (type.equals("Int")) SB.append(" i32* ");
-        else SB.append(" i8* ");
+        else SB.append(" i8** ");
  
-        SB.append(toScan).append(")");
+        SB.append(reg).append(")");
         Globals.outFile.println(SB.toString());
-        return returnReg;
+    
+        if (Globals.isPrimitiveType(type)) return generateLoadInst(getNewVariableName(), type, reg);
+        else return reg;
 
         
     }
@@ -411,9 +424,21 @@ public class IRBuilderUtils {
         Globals.outFile.println(Indent+returnReg+" = call i8* @strcat(i8* "+s1+", i8* "+s2+")");
         return returnReg;
     } 
-    public String generateSubStrCall(String i , String j , String returnReg){
-        return "";
+    public String generateSubStrCall(String s ,String i,String len,String returnReg){
+        StringBuilder SB = new StringBuilder();
+        SB.append(Indent+returnReg).append(" = call i8* @"+getClassMangledName("substr")+"(i8* "+s+", i32 "+i+", i32 "+len+")");
+        Globals.outFile.println(SB.toString());
+        return returnReg;
     }
+    public String generatetypeNameCall(String ptr,String clsName,String returnReg){
+        StringBuilder SB = new StringBuilder();
+        String reg = generateBitCastInst(ptr, clsName, "Object");
+        SB.append(Indent+returnReg).append(" = call i8* @"+getClassMangledName("type_name")+" (%class.Object* "+reg+")");
+        Globals.outFile.println(SB.toString());
+        return returnReg;
+    }
+    
+    
     public String generateExitCall(){
         // Also have to generate error message
         Globals.outFile.println(Indent+"call void @exit(i32 0)");
@@ -446,7 +471,74 @@ public class IRBuilderUtils {
         Globals.outFile.println(SB.toString());
 
     }
+    public void generatePreStructs(){
+        StringBuilder SB = new StringBuilder();
+        Globals.classNameToStructMap.put("IO","%class.IO");
+        Globals.classNameToStructMap.put("Object","%class.Object");
+        SB.append("%class.IO = type { i8 }\n");
+        SB.append("%class.Object = type { i8* }");
+        Globals.outFile.println(SB.toString());
+    }
 
+    public void generatePreConstructs(){
+        StringBuilder SB = new StringBuilder();
+        Globals.classToConstructorMap.put("IO","@"+getClassMangledName("IO"));
+        Globals.classToConstructorMap.put("Object", "@"+getClassMangledName("Object"));
+       Globals.currentLocalReg=0;
+        SB.append("define dso_local void @"+getClassMangledName("IO")+"(%class.IO* %this) {\n");
+        SB.append("entry:\n");
+        SB.append(Indent+"%this.addr = alloca %class.IO*\n");
+        SB.append(Indent+"store %class.IO* %this, %class.IO** %this.addr\n");
+        SB.append(Indent+"%this1 = load %class.IO* , %class.IO** %this.addr\n");
+        SB.append(Indent+"ret void\n}");
+        
+        Globals.currentLocalReg=0;
+        SB.append("\n\n");
+        SB.append("define dso_local void @"+getClassMangledName("Object")+"(%class.Object* %this, i8* %str) {\n");
+        SB.append("entry:\n");
+        SB.append(Indent+"%this.addr = alloca %class.Object*\n");
+        SB.append(Indent+"store %class.Object* %this, %class.Object** %this.addr\n");
+        SB.append(Indent+"%this1 = load %class.Object* , %class.Object** %this.addr\n");
+        SB.append(Indent+"%str.addr = alloca i8*\n");
+        SB.append(Indent+"store i8* %str, i8** %str.addr\n");
+        SB.append(Indent+"%0 = load i8*, i8** %str.addr\n");
+        SB.append(Indent+"%name = getelementptr inbounds %class.Object, %class.Object* %this1, i32 0, i32 0\n");
+        SB.append(Indent+"store i8* %0, i8** %name\n");
+    
+        SB.append(Indent+"ret void\n}");
 
+        SB.append("\n\n;Method substr\n");    
+        String mName = getClassMangledName("substr");
+    
+        Globals.currentLocalReg=0;
+        SB.append("define i8* @").append(mName).append("(i8* %str , i32 %begind ,i32 %endd) {\nentry:\n");
+        String newvar = getNewVariableName();
+        SB.append(Indent+newvar).append(" = zext i32 ").append("%endd").append(" to i64\n");
+        String mallocvar = getNewVariableName();
+        SB.append(Indent+mallocvar).append(" = call noalias i8* @malloc(i64 ").append(newvar).append(")\n");
+        String getvar = getNewVariableName();
+        SB.append(Indent+getvar).append(" = getelementptr inbounds i8, i8* %str, i32 %begind \n") ;
+        String callcopyvar = getNewVariableName();
+//        String type = getTypeid("String") ;
+        SB.append(Indent+callcopyvar).append(" = call i8* @strncpy(i8* ").append(mallocvar+", i8* "+getvar+", i64 "+newvar).append(")\n"); 
+        SB.append(Indent+"ret i8* "+mallocvar);
+        SB.append("\n}\n");
+        Globals.currentLocalReg=0;
+        SB.append("\n\n;Method type_name\n");
+        mName = getClassMangledName("type_name");
+        String Objtype = "%class.Object";//
+        SB.append("define i8* @").append(mName).append("("+Objtype +"* %selff) {\n");
+        SB.append("entry:\n");
+        String one = getNewVariableName();
+        SB.append(Indent+one+" = getelementptr inbounds %class.Object, %class.Object* %selff, i32 0, i32 0\n");
+        String two = getNewVariableName();
+        SB.append(Indent + two + " = load i8*, i8** ").append(one).append("\n");
+        SB.append(Indent+"ret i8* "+two+"\n}\n");
+        Globals.currentLocalReg=0;
+        Globals.outFile.println(SB.toString());
+ 
+    }
+
+  
 
 }

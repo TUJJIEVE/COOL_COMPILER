@@ -50,13 +50,58 @@ public class ConcreteVisitor implements Visitor {
 
 			
 		}
+		
 		public void addDefaultFuncs(){
-			// Globals.scopeTable.insert("concat", new AST.method("concat", new ArrayList<AST.formal>(new AST.formal("s", "String", 0),new AST.formal("s1","String",0)),"String", null, 0));
-			// Globals.scopeTable.insert("in_string", new AST.method("in_string",null,"String",null,0));
-			// Globals.scopeTable.insert("out_string",new AST.method("out_string",new ArrayList<AST.formal>(new AST.formal("x","String",0)),null,null,0));
-			// Globals.scopeTable.insert("out_int", new AST.method("out_int", new ArrayList<AST.formal>(new AST.formal("n", "Int", 0)), null, null, 0));
-			// Globals.scopeTable.insert("in_int",new AST.method("in_int", null,"Int", null, 0));
-			// Globals.scopeTable.insert("length",new AST.method("length", null, "Int", null, 0));
+			 ArrayList<AST.formal> f1 = new ArrayList<AST.formal>();
+			 AST.formal fo1 = new AST.formal("s","String",0);
+			 f1.add(fo1);
+			
+			 Globals.scopeTable.insert("concat", new AST.method("concat", f1,"String", null, 0));
+			 
+			 ArrayList<AST.formal> f2 = new ArrayList<AST.formal>();
+			 AST.formal f21 = new AST.formal(null,null,0);
+			 
+			 f2.add(f21);
+			
+				 
+			 Globals.scopeTable.insert("in_string", new AST.method("in_string",f2,"String",null,0));
+			 ArrayList<AST.formal> f3 = new ArrayList<AST.formal>();
+			 AST.formal f31 = new AST.formal("s","String",0);
+			 
+			 f3.add(f31);
+	
+	
+			 Globals.scopeTable.insert("out_string",new AST.method("out_string",f3,"String",null,0));
+			 ArrayList<AST.formal> f4 = new ArrayList<AST.formal>();
+			 AST.formal f41 = new AST.formal("s","Int",0);
+			 f4.add(f41);
+			 
+			 Globals.scopeTable.insert("out_int", new AST.method("out_int",f4,"Int", null, 0));
+			 ArrayList<AST.formal> f5 = new ArrayList<AST.formal>();
+			 AST.formal f51 = new AST.formal(null,null,0);
+			 f5.add(f51);
+		
+			 Globals.scopeTable.insert("in_int",new AST.method("in_int",f5,"Int", null, 0));
+			 ArrayList<AST.formal> f6 = new ArrayList<AST.formal>();
+			 AST.formal f61 = new AST.formal(null,null,0);
+			 f6.add(f61);
+	
+	
+			 Globals.scopeTable.insert("length",new AST.method("length", f6, "Int", null, 0));
+
+			 ArrayList<AST.formal> f7 = new ArrayList<AST.formal>();
+			 AST.formal f71 = new AST.formal("i","Int",0);
+			 AST.formal f72 = new AST.formal("j","Int",0);
+			 f7.add(f71);
+			 f7.add(f72);
+			 Globals.scopeTable.insert("substr",new AST.method("substr", f7, "String", null, 0));
+
+			 ArrayList<AST.formal> f8 = new ArrayList<AST.formal>();
+			 AST.formal f81 = new AST.formal(null,null,0);
+			 
+			 f8.add(f81);
+			 
+			Globals.scopeTable.insert("type_name",new AST.method("type_name",f8,"String",null,0));
 
 
 
@@ -73,7 +118,7 @@ public class ConcreteVisitor implements Visitor {
 			
 			stringsFound.add("%d");
 			stringsFound.add("%s");
-
+			stringsFound.add("Error : Division by zero");
 			Globals.IG.setGraph(listOfClasses);
 			Globals.methodMap.put("in_string","@scanf");
 			Globals.methodMap.put("out_int","@printf");
@@ -81,13 +126,29 @@ public class ConcreteVisitor implements Visitor {
 			Globals.methodMap.put("out_string","@printf");
 			Globals.methodMap.put("length","@strlen");
 			Globals.methodMap.put("concat","@strcat");
-		
+			Globals.methodMap.put("abort","@exit");
+			Globals.methodMap.put("malloc","@malloc");
+			Globals.methodMap.put("strncpy","@strncpy");
+			Globals.methodMap.put("substr","@"+Globals.IRB.getClassMangledName("substr"));
+			Globals.methodReturnMap.put("@strcat","String");
+			Globals.methodReturnMap.put("@strlen","Int");
+			Globals.methodReturnMap.put("@malloc","String");
+			Globals.methodReturnMap.put("@printf","String");
+			Globals.methodReturnMap.put("@scanf","String");
+			Globals.methodReturnMap.put("@exit","void");
+			Globals.methodReturnMap.put("@strncpy","String");
+			Globals.methodReturnMap.put("@"+Globals.IRB.getClassMangledName("substr"),"String");
+			Globals.methodMap.put("type_name","@"+Globals.IRB.getClassMangledName("type_name"));
+			Globals.methodReturnMap.put("@"+Globals.IRB.getClassMangledName("type_name"),"String");
+
 			//Globals.methodMap.put("substr","@")
 			for (AST.class_ cl : program.classes){
 				Globals.scopeTable.insertClass(cl);
 				addDefaultFuncs();
 				Globals.attributeToAddrMap.put(cl.name,new HashMap<AST.attr,Integer>());
-				int index = 0;
+				int index = 2;
+				if(Globals.IG.getClassNode(cl).parent!=null) index++;
+				stringsFound.add(cl.name);
 				for (AST.feature f : cl.features){
 					f.className = cl.name;
 					
@@ -107,7 +168,7 @@ public class ConcreteVisitor implements Visitor {
 					else {
 						if (f.name.equals("main")) Globals.mainReturnType = f.typeid;
 						Globals.methodMap.put(f.name,"@"+Globals.IRB.getFunctionMangledName(f.name,cl.name));
-						
+						Globals.methodReturnMap.put("@"+Globals.IRB.getFunctionMangledName(f.name,cl.name),f.typeid);
 						Globals.scopeTable.insert(f.name, ((AST.method)f));
 						
 					}
@@ -115,6 +176,7 @@ public class ConcreteVisitor implements Visitor {
 				Globals.scopeTable.printTable(cl);
 			}
 			Globals.outFile.println("\n");
+			Globals.IRB.generatePreStructs();
 			generateStructures(listOfClasses);     // For generating the structures of the classes defined.
 			Globals.IG.resetGraph();
 
@@ -123,8 +185,9 @@ public class ConcreteVisitor implements Visitor {
 				Globals.IRB.generateGlobalString(s);
 
 			}
-
+			Globals.IRB.generatePreConstructs();
 			Globals.outFile.println("\n");
+
 			generateConstructors(listOfClasses);  // For generating the constructors of the classes defined
 			Globals.IG.resetGraph();
 			Globals.IRB.generateMainMethod();	
@@ -159,6 +222,7 @@ public class ConcreteVisitor implements Visitor {
 			System.out.println("Generating method for :"+method.name);
 
 			Globals.currentLocalReg = 0;
+			Globals.IRB.labelNameMaker=0;
 			AST.class_ cl = Globals.scopeTable.currentClass;
 			StringBuilder SB = new StringBuilder();
 			Globals.outFile.println(";Class " + cl.name + " method " + method.name);

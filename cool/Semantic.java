@@ -24,89 +24,6 @@ public class Semantic{
 	}
 
 }
-// This class is used for inheritance graph
-// class ClassNode{
-// 	// Class used in the inheritance graph stores the parent of the class
-// 	public AST.class_ self;
-// 	public ClassNode parent;
-// 	public int isVisited;
-// 	public ClassNode(){
-// 		this.self = null;
-// 	}
-// 	public ClassNode(AST.class_ c){
-// 		this.self = c;
-// 		this.parent = null;
-// 		this.isVisited=0;
-// 	}
-// }
-// // Inheritance graph class which makes a graph from the classes present in the program 
-// // Contains methods to check for cycles in the graph
-// class InheritanceGraph{
-// 	ArrayList<ClassNode> listOfClasses;
-// 	public void setGraph(ArrayList<ClassNode> listOfClasses){
-// 		this.listOfClasses = listOfClasses;
-// 	}
-// 	// Function for checking if the inheritance graph is correct or not if not then return false else true
-// 	public boolean checkInheritanceGraph(){
-
-// 		for(int i=0;i<listOfClasses.size();i++){
-// 			ClassNode temp = listOfClasses.get(i);
-// 			if (temp.self.parent.equals("Object")) {
-// 				temp.parent=null;
-// 				continue;	
-// 			}
-// 			boolean cont = false;
-// 			for (int j=0;j<listOfClasses.size();j++){
-// 				if (temp.self.parent.equals(listOfClasses.get(j).self.name)){
-// 					temp.parent = listOfClasses.get(j);
-// 					cont =true;
-// 				}
-// 			}
-// 			if (!cont){
-// 				System.out.println("No matching parentclass found for class " + temp.self.name +"\nAborting...");
-// 				return false;
-// 			}
-// 		}	
-
-// 		for (ClassNode cn : listOfClasses){
-// 			boolean isCyclic = checkCycles(cn);
-// 			if (isCyclic) {
-
-// 				System.out.println("The inheritance graph contains cycles\nAborting...");
-// 				return false;
-// 			}
-// 		}
-
-// 		return true;
-
-// 	}
-// // Method to check if the inheritance graph contains cycles returns true if contains else false
-// 	public boolean checkCycles(ClassNode classNode){
-
-// 		if (classNode.self.parent.equals("Object")){
-// 			return false;
-// 		}
-// 		else if (classNode.isVisited == 1){
-// 			return true;
-// 		}
-// 		else {
-// 			classNode.isVisited=1;
-// 			boolean check = checkCycles(classNode.parent);
-// 			classNode.isVisited=0;
-// 			return check;
-// 		}
-// 	}
-// 	// Function to get the classNode in the inheritance graph
-// 	public ClassNode getClassNode(AST.class_ c){
-// 		for (ClassNode cn : listOfClasses){
-// 			if (cn.self.name.equals(c.name)){
-// 				return cn;
-// 			}
-// 		}
-// 		return null;
-// 	}
-// }
-
 /*
 	Interface for the Visitor design pattern 
 
@@ -170,7 +87,16 @@ class NodeVisitor implements ASTvisitor {
 			Table.insert("in_string",new AST.method("in_string",f6,"String",null,0));
 			List<AST.formal> f7 = new ArrayList<AST.formal>();
 			Table.insert("in_int",new AST.method("in_int",f7,"Int",null,0));
-
+			List<AST.formal> f8 = new ArrayList<AST.formal>();
+			
+			Table.insert("length", new AST.method("length",f8,"Int",null,0));
+			List<AST.formal> f9 = new ArrayList<AST.formal>();
+			f9.add(new AST.formal("s","String",0));
+			Table.insert("concat", new AST.method("concat",f9,"String",null,0));
+			List<AST.formal> f10 = new ArrayList<AST.formal>();
+			f10.add(new AST.formal("i","Int",0));
+			f10.add(new AST.formal("j","Int",0));
+			Table.insert("substr", new AST.method("substr",f10,"String",null,0));
 		}
 
 		return true;
@@ -666,25 +592,6 @@ class NodeVisitor implements ASTvisitor {
 										return E.type;
 
 									}
-	                           		// //System.out.println("*** The method not present in this class");
-	                         		// ClassNode currCl=IG.getClassNode(Table.currentClass);
-									// ClassNode par=currCl.parent;
-									// while (par!=null){
-									// 	Table.setCurrentClass(par.self);
-									// 	AST.ASTNode n=Table.lookUpClassSpace(((AST.dispatches)E).name); 
-									// 	if (n!=null && n instanceof AST.method){
-									// 		node = n;
-									// 		flag=true;									
-									// 		break;
-									// 	}
-									// 	par=par.parent;
-									// }
-									// Table.setCurrentClass(currCl.self);   // reset the current class in symbol table
-	                           		// if (!flag) {
-	                           		// 	reportError(Table.currentClass.filename,E.lineNo," method not found  in any of the inherited classes and in  "+ Table.currentClass.name);
-	                           		// 	E.type = "Object";
-	                           		// 	return E.type;
-	                           		// }
 	                           	}
 
 	                       		AST.method m = (AST.method) node;
@@ -699,11 +606,7 @@ class NodeVisitor implements ASTvisitor {
 	                           	
 								E.type ="Object";
 								return E.type;                           	
-		
-                       		
                        
-                            //it is similar to self.<id>(expr,expr..)
-                            // should check whether class in which this statement used has E.name if not present error.
                         }
                         else{
                         	//System.out.println("caller checking");
@@ -713,23 +616,42 @@ class NodeVisitor implements ASTvisitor {
            									 return "Object";
            						case "String":
            									 //System.out.println("The caller type is String");
-           									return "Object";
+												AST.ASTNode n = Table.lookUpClassSpace( ((AST.dispatches)E).name );
+												if (n==null){
+													reportError(Table.currentClass.filename,E.lineNo,"There is no method corresponding to IO class");
+													}
+												else {
+													if (checkParams((AST.method)n, (AST.dispatches)E )) {
+														E.type=((AST.method)n).typeid;
+														return E.type;
+														
+													}
+													reportError(Table.currentClass.filename,E.lineNo," parameters dont match with method  "+ ((AST.method)n).name);
+									
+													E.type = "Object";
+													return E.type;
+												}
+												reportError(Table.currentClass.filename,E.lineNo," method not found  in IO class ");
+												E.type = "Object";
+												return E.type;	   
+											
            						case "Bool" : 
            									// System.out.println("The caller type is String");
-           									return "Object";
+											   
+											   return "Object";
            						case "IO"   :
            									//System.out.println("The caller type is IO");
-           									AST.ASTNode n = Table.lookUpClassSpace( ((AST.dispatches)E).name );
-           									if (n==null){
+           									AST.ASTNode n1 = Table.lookUpClassSpace( ((AST.dispatches)E).name );
+           									if (n1==null){
            										reportError(Table.currentClass.filename,E.lineNo,"There is no method corresponding to IO class");
-           									}
+           										}
            									else {
-           										if (checkParams((AST.method)n, (AST.dispatches)E )) {
-           											E.type=((AST.method)n).typeid;
+           										if (checkParams((AST.method)n1, (AST.dispatches)E )) {
+           											E.type=((AST.method)n1).typeid;
         	   										return E.type;
     	       										
            										}
-           										reportError(Table.currentClass.filename,E.lineNo," parameters dont match with method  "+ ((AST.method)n).name);
+           										reportError(Table.currentClass.filename,E.lineNo," parameters dont match with method  "+ ((AST.method)n1).name);
 	                           	
            										E.type = "Object";
            										return E.type;
@@ -760,10 +682,11 @@ class NodeVisitor implements ASTvisitor {
 							AST.dispatches d = ((AST.dispatches)E);
 
 							if (E instanceof AST.static_dispatch){
-
+								AST.class_ curr = Table.currentClass;
 								Table.setCurrentClass(searchCl.self);
 								AST.ASTNode n = Table.lookUpClassSpace(d.name);
-								
+								Table.setCurrentClass(curr);
+								System.out.println(((AST.method)n).name +" " + d.name);
 								if ( n != null && n instanceof AST.method){
 									if (checkParams( (AST.method)n, d) ){
 										Table.setCurrentClass(currCl);
@@ -849,24 +772,6 @@ class NodeVisitor implements ASTvisitor {
 							E.type = "Object";
 							return E.type;
 						}
-						// ClassNode currCl=IG.getClassNode(Table.currentClass);
-						// ClassNode par=currCl.parent;
-						// while (par!=null){
-						// 	Table.setCurrentClass(par.self);
-						// 	node = Table.lookUpClassSpace(ag.name);
-						// 	if (node!=null && node instanceof AST.attr){
-								
-						// 		break;
-						// 	}
-						// 	par=par.parent;
-						// }
-						// Table.setCurrentClass(currCl.self);
-						// if (par == null){
-						// 	 reportError(Table.currentClass.filename,E.lineNo ," The id with name "+ag.name +" is not found");
-						// 	//System.out.println("***Error in assign :The id with name "+ag.name +" is not found");
-						// 	E.type = "Object";
-						// 	return E.type;
-						// }
 					}
 					if(subTypeOfClass(getType(ag.e1),((AST.formal)node).typeid)){
 						
@@ -877,7 +782,6 @@ class NodeVisitor implements ASTvisitor {
 					else{
 						//error
 						 reportError(Table.currentClass.filename,E.lineNo, getType(ag.e1) + " cant be assigned to "+((AST.feature)node).typeid); 
-						//System.out.println("***Error in assign : not valid types :E.type is assigned to node.typeid");
                         
 					}
 		
@@ -890,17 +794,12 @@ class NodeVisitor implements ASTvisitor {
 
 		boolean checkParams(AST.method m ,AST.dispatches d){ // Fpr checking the parameters of dispatch instruction and method
 			if (d.actuals == null || m.formals == null) return false;
-			System.out.println("checking params");
 			if (m.formals.size() != (d.actuals.size())) {
 				System.out.println("The number of parameters passed doesn't match");
 				return false;
 			}
 			for (int i=0;i<m.formals.size();i++){
-				// AST.ASTNode node = Table.lookUpGlobal(, AST.formal.class);
-				// if (node == null) node = Table.lookUpGlobal(d.name, AST.attr.class);
-				// if (node == null) node = Table.lookUpParent(d.name, AST.attr.class);
-				// if (node == null) System.out.println(); 
-				 if (!m.formals.get(i).typeid.equals(getType(d.actuals.get(i)))){
+				 if (! m.formals.get(i).typeid.equals(getType(d.actuals.get(i)))){
 					System.out.println("The parameters type don't match with the signature");
 					return false;
 				}

@@ -5,6 +5,10 @@ import java.*;
 
 
 // To Do : Implement String and printf and scanf codes. 
+// To Do : implement the default functions check if new assign , if  are working properly 
+// To Do : collect all the strings in the program can use semantic analyzer to collect all strings.
+// To Do : how to assign of class types .
+// To Do : 
 
 public class IRBuilder extends IRBuilderUtils{
     public IRBuilder(){
@@ -15,7 +19,7 @@ public class IRBuilder extends IRBuilderUtils{
 
         Globals.outFile.println(";Constructor for class "+cl.name);
         System.out.println("Generating constructors for class:" + cl.name);
-
+        Globals.currentLocalReg=0;
         Globals.currentClassPtrType=getTypeid(cl.name, 0);
         Globals.scopeTable.setCurrentClass(cl);
 
@@ -32,11 +36,20 @@ public class IRBuilder extends IRBuilderUtils{
         generateStoreInst(allocaReg ,cl.name , "%this");
         String ptrReg = generateLoadInst("%this1", cl.name, allocaReg);
         
+        
+        String gePreg = generateGEPInstForAttr("clsName",cl.name,"%this1",1);
+        Globals.outFile.println(Indent+"store i8* getelementptr inbounds (["+(cl.name.length()+1) +" x i8], ["+(cl.name.length()+1) +"x i8]* "+Globals.globalStrings.get(cl.name)+", i32 0, i32 0), i8** "+gePreg);
+        gePreg = generateGEPInstForAttr("clsName1",cl.name,"%this1",1);
+        String reg1 = getNewVariableName();
+        generateLoadInst(reg1,"String",gePreg);
+        String bc=generateBitCastInst("%this1",cl.name,"Object");
+        generateCallCtor("void",Globals.classToConstructorMap.get("Object"),"Object",bc+", i8* "+reg1);
+        
         ClassNode parentClass= Globals.IG.getClassNode(cl).parent;
         // Calling the constructor of the parent class
         if (parentClass!=null){
             String tempReg = generateBitCastInst(ptrReg, cl.name, parentClass.self.name);
-            generateCallCtor("IO", Globals.classToConstructorMap.get(parentClass.self.name),parentClass.self.name,tempReg);
+            generateCallCtor("void", Globals.classToConstructorMap.get(parentClass.self.name),parentClass.self.name,tempReg);
         }
         
 
@@ -70,13 +83,14 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for plus");
             StringBuilder SB = new StringBuilder();
+            String ee1 = generateInstruction(((AST.plus)e).e1) ; //ee1 type should be interger
+            String ee2 = generateInstruction(((AST.plus)e).e2) ; //ee2 type should be interger
+
             String value = getNewVariableName() ;
             SB.append(Indent+value);
             SB.append(" = "); //
-            String ee1 = generateInstruction(((AST.plus)e).e1) ; //ee1 type should be interger
-            String ee2 = generateInstruction(((AST.plus)e).e2) ; //ee2 type should be interger
             
-            SB.append("add " + Int_32 + " " + ee1 + " , "+ ee2);
+            SB.append("add " + Int_32 + " " + ee1 + ", "+ ee2);
             
             Globals.outFile.println(SB.toString());
             return value;
@@ -86,13 +100,14 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for sub");
             StringBuilder SB = new StringBuilder();
-            String value = getNewVariableName() ;
-            SB.append(Indent+value).append(" = ");
-            
             String ee1 = generateInstruction(((AST.sub)e).e1) ; //ee1 type should be interger
             String ee2 = generateInstruction(((AST.sub)e).e2) ; //ee2 type should be interger
 
-            SB.append("sub " + Int_32 + " " + ee1 + " , "+ ee2 );
+            String value = getNewVariableName() ;
+            SB.append(Indent+value).append(" = ");
+            
+
+            SB.append("sub " + Int_32 + " " + ee1 + ", "+ ee2 );
             Globals.outFile.println(SB.toString());
             return value;
             
@@ -102,13 +117,14 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for mul");
             StringBuilder SB = new StringBuilder();
-            String value = getNewVariableName() ;
-            SB.append(Indent+value).append(" = ");
-            
             String ee1 = generateInstruction(((AST.mul)e).e1) ; //ee1 type should be interger
             String ee2 = generateInstruction(((AST.mul)e).e2) ; //ee2 type should be interger
 
-            SB.append(Indent+"mul " + Int_32 + " " + ee1 + " , "+ ee2);
+            String value = getNewVariableName() ;
+            SB.append(Indent+value).append(" = ");
+            
+
+            SB.append(Indent+"mul " + Int_32 + " " + ee1 + ", "+ ee2);
             Globals.outFile.println(SB.toString());
             return value;
 
@@ -117,12 +133,31 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for divide");
             StringBuilder SB = new StringBuilder();
-            String value = getNewVariableName() ;
-            SB.append(Indent+value).append(" = ");
+            
             String ee1 = generateInstruction(((AST.divide)e).e1) ; //ee1 type should be interger
             String ee2 = generateInstruction(((AST.divide)e).e2) ; //ee2 type should be interger
-
-            SB.append("udiv " + Int_32 + " " + ee1 + " , "+ ee2 );
+            
+            String ifThenLabel = "if.then"+getNewlabelName();
+            String ifElseLabel = "if.else"+getNewlabelName();
+            String ifEndLabel = "if.end"+getNewlabelName();
+            String reg = getNewVariableName();            
+            SB.append(Indent+reg+" = icmp eq i32 "+ee2+", 0\n");
+            SB.append(Indent+"br i1 ").append(reg).append(", label %").append(ifThenLabel).append(", label %").append(ifElseLabel);
+            SB.append("\n").append("\n");
+            SB.append(ifThenLabel).append(":");
+            Globals.outFile.println(SB.toString());
+            SB.setLength(0);
+            String printfreg = getNewVariableName();
+            
+            generatePrintfCall("Error : Division by zero",printfreg,"Direct");
+            SB.append(Indent+"call void @exit(i32 1)\n");            
+            SB.append(Indent+"br label %"+ifEndLabel+"\n");
+            SB.append("\n").append(ifElseLabel).append(":\n");
+            SB.append(Indent+"br label %"+ifEndLabel+"\n");
+            SB.append("\n").append(ifEndLabel).append(":\n");
+            String value = getNewVariableName() ;
+            SB.append(Indent+value).append(" = ");
+            SB.append("udiv " + Int_32 + " " + ee1 + ", "+ ee2 );
             Globals.outFile.println(SB.toString());
             return value;
 
@@ -132,13 +167,13 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for lt");
             StringBuilder SB = new StringBuilder() ;
-
-            String value = getNewVariableName() ;
             String ee1 = generateInstruction(((AST.lt)e).e1) ; //ee1 type should be interger
             String ee2 = generateInstruction(((AST.lt)e).e2) ; //ee2 type should be interger
 
+            String value = getNewVariableName() ;
+
             SB.append(Indent+value).append(" = ");
-            SB.append("icmp ult "+ ee1 + " , "+ ee2 );
+            SB.append("icmp ult i32 "+ ee1 + ", "+ ee2);
             Globals.outFile.println(SB.toString());
             return value;
 
@@ -147,26 +182,32 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for leq");
             StringBuilder SB = new StringBuilder() ;
-
-            String value = getNewVariableName() ;
             String ee1 = generateInstruction(((AST.leq)e).e1) ; //ee1 type should be interger
             String ee2 = generateInstruction(((AST.leq)e).e2) ; //ee2 type should be interger
 
+            String value = getNewVariableName() ;
+
             SB.append(Indent+value).append(" = ");
-            SB.append("icmp ule " + ee1 + " , "+ ee2);
+            SB.append("icmp ule i32 " + ee1 + ", "+ ee2);
             Globals.outFile.println(SB.toString());
             return value;
+
+        }
+        else if (e instanceof AST.isvoid){
+            // To Do : Implement
+
 
         }
         else if (e instanceof AST.eq){
 
             System.out.println("Generating Instructions for eq");
             StringBuilder SB = new StringBuilder() ;
-            String value = getNewVariableName() ;
             String ee1 = generateInstruction(((AST.eq)e).e1) ; //ee1 type should be interger
             String ee2 = generateInstruction(((AST.eq)e).e2) ; //ee2 type should be interger
+
+            String value = getNewVariableName() ;
             SB.append(Indent+value).append(" = ");
-            SB.append("icmp eq " + ee1 + " , "+ ee2  );
+            SB.append("icmp eq i32 " + ee1 + ", "+ ee2);
             Globals.outFile.println(SB.toString());
             return value;
 
@@ -175,12 +216,12 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for comp");
             StringBuilder SB = new StringBuilder() ;
-            String value = getNewVariableName() ;
             String ee1 = generateInstruction(((AST.comp)e).e1) ; //ee1 type should be interger
             ee1 = ee1.contains(" ") ? ee1.split(" ")[0] : ee1 ;
+            String value = getNewVariableName() ;
             
             SB.append(Indent+value).append(" = ");
-            SB.append("xor "+Int_32 + ee1 + " , -1 " ); //finding ones complement
+            SB.append("xor "+Int_32 + ee1 + ", -1 " ); //finding ones complement
             Globals.outFile.println(SB.toString());
             return value;
         }
@@ -188,8 +229,8 @@ public class IRBuilder extends IRBuilderUtils{
 
             System.out.println("Generating Instructions for neg");
             StringBuilder SB = new StringBuilder();
-                String value = getNewlabelName() ;
                 String exprvalue = generateInstruction(((AST.neg)e).e1) ;
+                String value = getNewlabelName() ;
 
                 SB.append(value).append(" = xor ").append(Bool).append(" ").append(exprvalue).append(" , -1 ") ; //adding xor value with 1 gives complement  
                
@@ -203,35 +244,48 @@ public class IRBuilder extends IRBuilderUtils{
             String ifbody = "if.then"+getNewlabelName() ;
             String elsebody = "if.else"+getNewlabelName() ;
             String afterbranch = "if.end"+getNewlabelName() ;
+            String expType = ((AST.cond)e).type;
             // To do : see if bitcast instruction is needed or not
             //adding br instruction in this block//
+            String returnReg = getNewVariableName();
+            SB.append(Indent+returnReg +" = alloca "+getTypeid(expType,0));
             SB.append(Indent+"br i1 ").append(predicate).append(", label %").append(ifbody).append(", label %").append(elsebody) ;
 
             //create label instruction of ifblock ;//
             SB.append("\n\n");
-            Globals.liveAttrPtr.clear();
+         //   Globals.liveAttrPtr.clear();
             SB.append(ifbody).append(":") ;
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
             
-            generateInstruction(((AST.cond)e).ifbody) ;
-            
+            String bodyResult = generateInstruction(((AST.cond)e).ifbody) ;
+            // See if correct
+            if (! expType.equals(((AST.cond)e).ifbody.type)){
+                bodyResult = generateBitCastInst(bodyResult,((AST.cond)e).ifbody.type,expType);
+            }
+            generateStoreInst(returnReg,expType,bodyResult);
+          
             SB.append(Indent+"br label %").append(afterbranch);
             SB.append("\n\n");
-            Globals.liveAttrPtr.clear();
+           // Globals.liveAttrPtr.clear();
             SB.append(elsebody).append(":") ;
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
-            
-            generateInstruction(((AST.cond)e).elsebody) ;
+            // See if correct
+            bodyResult=generateInstruction(((AST.cond)e).elsebody) ;
+            if (! expType.equals(((AST.cond)e).elsebody.type)){
+                bodyResult = generateBitCastInst(bodyResult,((AST.cond)e).elsebody.type,expType);
+            }
+            generateStoreInst(returnReg,expType,bodyResult);
             
             SB.append(Indent+"br label %").append(afterbranch);
             SB.append("\n\n");
-            Globals.liveAttrPtr.clear();
+          //  Globals.liveAttrPtr.clear();
             SB.append(afterbranch).append(":");
             Globals.outFile.println(SB.toString());
             
-            return predicate;  // see if returned value to be used anywhere or not
+            return generateLoadInst(getNewVariableName(),expType,returnReg);
+            //return predicate;  // see if returned value to be used anywhere or not
         }
 
         else if (e instanceof AST.block){
@@ -249,30 +303,32 @@ public class IRBuilder extends IRBuilderUtils{
             
             System.out.println("Generating Instructions for loop");
             StringBuilder SB = new StringBuilder() ;
-            Globals.liveAttrPtr.clear();
+         //   Globals.liveAttrPtr.clear();
             String loopNumber  =  getNewLoopName();
-            Globals.outFile.println("");
+            String predicate = generateInstruction(((AST.loop)e).predicate);
+            Globals.outFile.println(Indent+"br i1 "+predicate+", label %while.cond"+loopNumber+", label %while.end"+loopNumber);
+            Globals.outFile.print("");
             SB.append("while.cond"+loopNumber).append(":");
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
             String value = generateInstruction(((AST.loop)e).predicate) ;
             if(! ((AST.loop)e).predicate.type.equals("Bool")) value = getTruncInst(value,getTypeid(value,0),"i1"); //how to get typeid //
-            SB.append(Indent+"br i1 ").append(value).append(" , label ").append("while.body"+loopNumber).append(" , label ").append("while.end"+loopNumber) ; //conditional branch
+            SB.append(Indent+"br i1 ").append(value).append(" , label ").append("%while.body"+loopNumber).append(" , label ").append("%while.end"+loopNumber) ; //conditional branch
             SB.append("\n\n");
-            Globals.liveAttrPtr.clear();
+         //   Globals.liveAttrPtr.clear();
             SB.append("while.body"+loopNumber).append(":");
             Globals.outFile.println(SB.toString());
             SB.setLength(0);
 
             value = generateInstruction(((AST.loop)e).body);
 
-            SB.append(Indent+"br label ").append("while.cond"+loopNumber).append("\n\n");
-            Globals.liveAttrPtr.clear();
+            SB.append(Indent+"br label ").append("%while.cond"+loopNumber).append("\n\n");
+          //  Globals.liveAttrPtr.clear();
             SB.append("while.end"+loopNumber).append(":");
 
             Globals.outFile.println(SB.toString());
 
-            return value ;
+            return null ;
         }
         else if (e instanceof AST.assign){
 
@@ -283,7 +339,9 @@ public class IRBuilder extends IRBuilderUtils{
                  String interReg = "";
                  if (id!=null){
                      generateStoreInst("%"+((AST.formal)id).name+".addr", ((AST.formal)id).typeid, finalReg );                    
-                    return "";
+                     if(Globals.isPrimitiveType(((AST.assign)e).type) ) return generateLoadInst(getNewVariableName(),((AST.assign)e).type,"%"+((AST.formal)id).name+".addr");        
+
+                     else return "%"+((AST.formal)id).name+".addr";
                 }
                  if (id==null) id = Globals.scopeTable.lookUpGlobal(((AST.assign)e).name,AST.attr.class);
                  
@@ -292,7 +350,9 @@ public class IRBuilder extends IRBuilderUtils{
                    interReg = generateBitCastInst("%this1", Globals.scopeTable.currentClass.name,Globals.scopeTable.parClass.name);        
                    if (Globals.liveAttrPtr.get(((AST.assign)e).name)==null) interReg = generateGEPInstForAttr(((AST.assign)e).name,Globals.scopeTable.parClass.name, interReg, Globals.attributeToAddrMap.get(Globals.scopeTable.parClass.name).get(((AST.attr)id))); 
                    generateStoreInst(interReg,((AST.attr)id).typeid,finalReg);
-                    return "";
+                   if(Globals.isPrimitiveType(((AST.assign)e).type) ) return generateLoadInst(getNewVariableName(),((AST.assign)e).type,interReg);        
+      
+                   else return interReg;
                 }
                 else{
                     interReg ="%"+((AST.assign)e).name;
@@ -305,7 +365,9 @@ public class IRBuilder extends IRBuilderUtils{
                     generateStoreInst(interReg,((AST.attr)id).typeid, finalReg);
 
                 }
-            return "";        
+            // Check If this is correct
+            if(Globals.isPrimitiveType(((AST.assign)e).type) ) return generateLoadInst(getNewVariableName(),((AST.assign)e).type,interReg);        
+            else return interReg;
         }
 
         else if (e instanceof AST.new_){
@@ -314,13 +376,14 @@ public class IRBuilder extends IRBuilderUtils{
             StringBuilder SB = new StringBuilder() ;
             String addressToStore = getNewVariableName();
             generateAllocaInst(((AST.new_)e).typeid , addressToStore,false) ; 
-            if (Globals.isPrimitiveType(((AST.new_)e).typeid)){
-                //String value = getNewVariableName() ; 
-               // return  generateLoadInst(value , ((AST.new_)e).typeid , addressToStore) ;
-                return addressToStore;
+            if (Globals.isPrimitiveType(((AST.new_)e).typeid) && !((AST.new_)e).typeid.equals("void")){
+                String value = getNewVariableName() ; 
+                generateDefaultStore(((AST.new_)e).typeid,addressToStore);
+                return  generateLoadInst(value , ((AST.new_)e).typeid , addressToStore) ;
+            //    return addressToStore;
             }
             else {
-                generateCallCtor("IO",Globals.classToConstructorMap.get(((AST.new_)e).typeid),((AST.new_)e).typeid,addressToStore);
+                generateCallCtor("void",Globals.classToConstructorMap.get(((AST.new_)e).typeid),((AST.new_)e).typeid,addressToStore);
                 return addressToStore;
             }
             // addressToStore ; //contains address of Object ;
@@ -364,7 +427,7 @@ public class IRBuilder extends IRBuilderUtils{
             System.out.println("Generating Instructions for string");
             StringBuilder SB = new StringBuilder();
             String string = ((AST.string_const)e).value;
-            Integer length  = string.length();
+            Integer length  = string.length()+1;
             
             SB.append("getelementptr inbounds (").append("[").append(length.toString()).append(" x i8]");
             SB.append(", ").append("[").append(length.toString()).append(" x i8]").append("* ").append(Globals.globalStrings.get(string));
@@ -410,7 +473,10 @@ public class IRBuilder extends IRBuilderUtils{
             }
             for ( AST.expression exp : ((AST.static_dispatch)e).actuals){
                 String reg = generateInstruction(exp);
-                if (! md.formals.get(index).typeid.equals(exp.type) ){
+                System.out.println(reg);
+                System.out.println("exp:type:"+exp.type);
+                System.out.println(((AST.static_dispatch)e).name);
+                if ( ! md.formals.get(index).typeid.equals(exp.type) ){
                     reg = generateBitCastInst(reg,md.formals.get(index).typeid,exp.type);                        
                 }
                 arguments.add(reg);
@@ -420,8 +486,9 @@ public class IRBuilder extends IRBuilderUtils{
             }
             
             String methodName = Globals.methodMap.get(((AST.static_dispatch)e).name);
-            System.out.println(methodName);
-            String returnType = ((AST.static_dispatch)e).typeid;
+            
+            String returnType = Globals.methodReturnMap.get(methodName);
+            System.out.println(methodName + returnType);
             String returnReg = "%call";
 
             if (callNameMaker > 0 ) returnReg+=callNameMaker.toString();
@@ -430,21 +497,13 @@ public class IRBuilder extends IRBuilderUtils{
             callNameMaker++;
 
             if ( ((AST.static_dispatch)e).name.equals("out_string") || ((AST.static_dispatch)e).name.equals("out_int") ){
-                /*
-                @.str.1 = private unnamed_addr constant [3 x i8] c"%f\00", align 1
-                @.str.2 = private unnamed_addr constant [3 x i8] c"%d\00", align 1
-                %call3 = call i32 (i8*, ...) @printf(i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.1, i32 0, i32 0), i32 %2)
-                %call4 = call i32 (i8*, ...) @scanf(i8* getelementptr inbounds ([3 x i8], [3 x i8]* @.str.2, i32 0, i32 0), i32* %v)
-
-                printf takes arguments same is scanf so out_string in_string out_int and in_int 
-                */
                 if (((AST.static_dispatch)e).name.equals("out_int")) return generatePrintfCall(arguments.get(1),returnReg,"Int");
                 else return generatePrintfCall(arguments.get(1),returnReg,"String");
             
             }
             else if (((AST.static_dispatch)e).name.equals("in_string") || ((AST.static_dispatch)e).name.equals("in_int") ){
-                if (((AST.static_dispatch)e).name.equals("out_int")) return  generateScanfCall(arguments.get(1),returnReg,"Int");
-                return generateScanfCall(arguments.get(1),returnReg,"String");
+                if (((AST.static_dispatch)e).name.equals("in_int")) return  generateScanfCall(returnReg,"Int");
+                return generateScanfCall(returnReg,"String");
             }
             else if (((AST.static_dispatch)e).name.equals("length")){
                 return generateStrLenCall(arguments.get(0),returnReg);
@@ -453,7 +512,7 @@ public class IRBuilder extends IRBuilderUtils{
                 return generateStrConcatCall(arguments.get(0),arguments.get(1),returnReg);
             }
             else if (((AST.static_dispatch)e).name.equals("substr")){
-                return generateSubStrCall(arguments.get(1),arguments.get(2),returnReg);
+                return generateSubStrCall(arguments.get(0),arguments.get(1),arguments.get(2),returnReg);
             
             }
             else if (((AST.static_dispatch)e).name.equals("abort")){
@@ -461,7 +520,7 @@ public class IRBuilder extends IRBuilderUtils{
                 //return "";
             }
             else if (((AST.static_dispatch)e).name.equals("type_name")){
-                
+                return generatetypeNameCall(arguments.get(0),((AST.static_dispatch)e).caller.type,returnReg);
             }
             else generateCallInst(returnType,methodName,types,arguments,returnReg);
             
