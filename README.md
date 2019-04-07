@@ -1,6 +1,6 @@
 
 #                        cool language semantics 
-##                        CS3423: Assignment 2
+##                        
 ###                                                 -cs16btech11029,cs16btech11039
 #### =========================================================================
 ##### contents:
